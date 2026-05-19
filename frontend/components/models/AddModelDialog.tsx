@@ -5,7 +5,6 @@ import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 
 interface Props {
   open: boolean;
@@ -59,11 +58,6 @@ export function AddModelDialog({ open, providers, onClose, onAdded }: Props) {
       [key]: value,
       ...(key === "label" ? { id: toVariantId(value as string) } : {}),
     }));
-
-  const providerHasKey = (name: string) => {
-    const p = providers[name];
-    return p ? Boolean(p.api_key_env) : false;
-  };
 
   const handleSubmit = async () => {
     if (!form.id || !form.label || !form.provider || !form.model) {
