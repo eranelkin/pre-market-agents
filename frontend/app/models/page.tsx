@@ -39,11 +39,11 @@ function StatusBadge({
 
   if (result) {
     return result.status === "ok" ? (
-      <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 cursor-pointer" onClick={runTest}>
+      <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-400 cursor-pointer" onClick={runTest}>
         ✓ {result.latency_ms}ms
       </span>
     ) : (
-      <span className="inline-flex items-center gap-1 text-xs font-semibold text-destructive cursor-pointer" title={result.message ?? ""} onClick={runTest}>
+      <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-400 cursor-pointer" title={result.message ?? ""} onClick={runTest}>
         ✗ Error
       </span>
     );
@@ -52,10 +52,10 @@ function StatusBadge({
   return (
     <button
       onClick={runTest}
-      className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-semibold cursor-pointer transition-opacity hover:opacity-80 ${
+      className={`inline-flex items-center rounded px-2.5 py-0.5 text-xs font-medium cursor-pointer transition-opacity hover:opacity-80 ${
         status === "ready"
-          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-          : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+          ? "bg-emerald-500/15 text-emerald-400"
+          : "bg-amber-500/15 text-amber-400"
       }`}
       title="Click to test connection"
     >
@@ -137,23 +137,25 @@ export default function ModelsPage() {
 
   return (
     <main className="min-h-screen bg-background">
-      <div className="max-w-6xl mx-auto p-6 space-y-6">
+      <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Models</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Configure AI providers and model variants. API keys are stored in <code className="font-mono text-xs">.env</code> only.
+            <h1 className="text-2xl font-bold tracking-tight">Models</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Configure AI providers and model variants. API keys are stored in <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">.env</code> only.
             </p>
           </div>
-          <Button onClick={() => setDialogOpen(true)}>+ Add Model</Button>
+          <Button onClick={() => setDialogOpen(true)} className="bg-blue-600 hover:bg-blue-500 text-white border-0">
+            + Add Model
+          </Button>
         </div>
 
         {error && <p className="text-sm text-destructive">{error}</p>}
 
         {/* Table */}
         {data && (
-          <div className="rounded-md border overflow-auto">
+          <div className="rounded-lg border border-border overflow-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -173,15 +175,15 @@ export default function ModelsPage() {
                       <span className="flex items-center gap-2">
                         {v.label}
                         {v.id === firstActiveId && (
-                          <span className="rounded-full bg-primary/10 text-primary text-xs px-2 py-0.5 font-semibold">
+                          <span className="rounded-full bg-blue-500/20 text-blue-400 text-xs px-2 py-0.5 font-medium">
                             default
                           </span>
                         )}
                       </span>
                     </TableCell>
-                    <TableCell className="font-mono text-sm text-muted-foreground">{v.model}</TableCell>
-                    <TableCell className="text-sm">{v.provider}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground max-w-[180px] truncate" title={v.base_url ?? ""}>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{v.model}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{v.provider}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground max-w-[220px] truncate font-mono" title={v.base_url ?? ""}>
                       {v.base_url ?? "—"}
                     </TableCell>
                     <TableCell className="text-center">

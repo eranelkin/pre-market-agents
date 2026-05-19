@@ -12,15 +12,17 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <body className={inter.className}>
-        <header className="border-b bg-background sticky top-0 z-50">
-          <nav className="max-w-6xl mx-auto px-6 h-12 flex items-center gap-6">
-            <span className="font-semibold text-sm tracking-tight">Pre-Market Advisor</span>
-            <Link href="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+        <header className="border-b border-border bg-background sticky top-0 z-50">
+          <nav className="max-w-7xl mx-auto px-6 h-12 flex items-center gap-1">
+            <span className="font-bold text-sm tracking-tight text-foreground mr-4">
+              Pre-Market Advisor
+            </span>
+            <Link href="/" className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-colors">
               Home
             </Link>
-            <Link href="/models" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <Link href="/models" className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-colors">
               Models
             </Link>
           </nav>
