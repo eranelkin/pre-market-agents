@@ -1,0 +1,139 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Pre-Market Advisor — Agent & Model Configuration
+#
+# ADDING A NEW PROVIDER:  add an entry under `providers`, set api_key_env
+# ADDING A NEW MODEL:     add an entry under `model_variants`
+# SWITCHING AN AGENT:     change default_variant / fallback_variant
+# RUNNING MULTIPLE MODELS: add IDs to pipeline.active_variants
+# ─────────────────────────────────────────────────────────────────────────────
+
+providers:
+  anthropic:
+    api_key_env: ANTHROPIC_API_KEY
+    base_url: "https://api.anthropic.com"
+    supports_tool_use: true
+    supports_built_in_search: false   # tool-use search only
+
+  openai:
+    api_key_env: OPENAI_API_KEY
+    base_url: "https://api.openai.com/v1"
+    supports_tool_use: true
+    supports_built_in_search: false
+
+  google:
+    api_key_env: GOOGLE_API_KEY
+    base_url: "https://generativelanguage.googleapis.com/v1beta"
+    supports_tool_use: true
+    supports_built_in_search: true    # Gemini grounding activated automatically
+
+  groq:
+    api_key_env: GROQ_API_KEY
+    base_url: "https://api.groq.com/openai/v1"
+    supports_tool_use: false          # Groq does not support tool calling
+    supports_built_in_search: false
+
+
+# Each entry is one runnable model. Give it a short id — this is what you put
+# in pipeline.active_variants and in each agent's default_variant / fallback_variant.
+model_variants:
+  - id: claude_sonnet
+    label: "Claude Sonnet 4.6"
+    provider: anthropic
+    model: claude-sonnet-4-6
+    max_tokens: 4096
+
+  - id: gpt4o
+    label: "GPT-4o"
+    provider: openai
+    model: gpt-4o
+    max_tokens: 4096
+
+  - id: gemini_flash
+    label: "Gemini 1.5 Flash (free tier)"
+    provider: google
+    model: gemini-1.5-flash
+    max_tokens: 4096
+
+  - id: llama_groq
+    label: "Llama 3.1 70B via Groq (free tier)"
+    provider: groq
+    model: llama-3.1-70b-versatile
+    max_tokens: 4096
+
+
+# Per-agent configuration. Each agent uses default_variant for its LLM call.
+# If that variant fails after retries, fallback_variant is used.
+# prompt_file is relative to the project root.
+agents:
+  technical:
+    prompt_file: prompts/technical_prompt.md
+    default_variant: claude_sonnet
+    fallback_variant: gemini_flash
+    max_tokens: 2000
+    timeout_seconds: 45
+    enable_web_search: false
+    enable_deep_search: false
+
+  fundamental:
+    prompt_file: prompts/fundamental_prompt.md
+    default_variant: claude_sonnet
+    fallback_variant: gemini_flash
+    max_tokens: 2000
+    timeout_seconds: 45
+    enable_web_search: false
+    enable_deep_search: false
+
+  sentiment:
+    prompt_file: prompts/sentiment_prompt.md
+    default_variant: claude_sonnet
+    fallback_variant: gemini_flash
+    max_tokens: 2000
+    timeout_seconds: 45
+    enable_web_search: true           # sentiment benefits from live news lookup
+    enable_deep_search: false
+
+  risk:
+    prompt_file: prompts/risk_prompt.md
+    default_variant: claude_sonnet
+    fallback_variant: gemini_flash
+    max_tokens: 2000
+    timeout_seconds: 45
+    enable_web_search: false
+    enable_deep_search: false
+
+  macro:
+    prompt_file: prompts/macro_prompt.md
+    default_variant: claude_sonnet
+    fallback_variant: gemini_flash
+    max_tokens: 2000
+    timeout_seconds: 45
+    enable_web_search: true           # macro benefits from sector/index context
+    enable_deep_search: false
+
+  ceo:
+    prompt_file: prompts/ceo_prompt.md
+    default_variant: claude_sonnet
+    fallback_variant: gemini_flash
+    max_tokens: 8000
+    timeout_seconds: 120
+    enable_web_search: false
+    enable_deep_search: false
+
+
+pipeline:
+  chunk_size: 5
+
+  # Which model variants to run. One entry = single run, no comparison.
+  # Multiple entries = one full pipeline per variant + comparison step at end.
+  active_variants:
+    - claude_sonnet
+
+  # When active_variants has more than one entry, automatically run the
+  # comparison component after all variant pipelines complete.
+  compare_when_multiple: true
+
+
+search:
+  provider: tavily             # tavily | brave | serpapi
+  api_key_env: TAVILY_API_KEY
+  max_results: 5
