@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import os
 
 import structlog
 from fastapi import FastAPI
@@ -7,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.api.routes import compare, health, models, results, run
 from backend.config import settings
 from backend.providers.registry import get_provider_registry
+from backend.utils.env_manager import read_env_file
 from backend.utils.prompt_manager import get_prompt_manager
 
 log = structlog.get_logger()
@@ -16,6 +18,12 @@ log = structlog.get_logger()
 async def lifespan(app: FastAPI):
     # ── Startup ────────────────────────────────────────────────────────────────
     log.info("startup_begin", env=settings.app_env)
+
+    # Push .env values into os.environ so key_is_set() and providers see them.
+    # pydantic-settings reads .env into Settings fields but does not set os.environ.
+    for k, v in read_env_file().items():
+        if v and k not in os.environ:
+            os.environ[k] = v
 
     # Register AI providers that have API keys configured
     get_provider_registry().initialize()

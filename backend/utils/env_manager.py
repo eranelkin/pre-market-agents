@@ -47,4 +47,6 @@ def write_env_var(key: str, value: str) -> None:
 
 
 def key_is_set(env_var_name: str) -> bool:
-    return bool(os.environ.get(env_var_name))
+    if os.environ.get(env_var_name):
+        return True
+    return bool(read_env_file().get(env_var_name))
