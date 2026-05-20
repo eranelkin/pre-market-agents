@@ -168,6 +168,14 @@ export interface PromptInfo {
   content: string;
   last_modified: string | null;
   char_count: number;
+  is_built_in: boolean;
+}
+
+export interface CreatePromptPayload {
+  agent_name: string;
+  weight: number;
+  content: string;
+  default_variant?: string;
 }
 
 export interface ModelsResponse {
@@ -231,10 +239,22 @@ export const api = {
   // ── Prompt management ─────────────────────────────────────────────────────
   listPrompts: () => apiFetch<PromptInfo[]>("/api/v1/prompts"),
 
+  createPrompt: (payload: CreatePromptPayload) =>
+    apiFetch<{ status: string; agent_name: string; prompt_file: string }>(
+      "/api/v1/prompts",
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }
+    ),
+
   updatePrompt: (agentName: string, content: string) =>
     apiFetch<{ status: string; agent_name: string; char_count: number }>(
       `/api/v1/prompts/${agentName}`,
       { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content }) }
+    ),
+
+  deletePrompt: (agentName: string) =>
+    apiFetch<{ status: string; agent_name: string }>(
+      `/api/v1/prompts/${agentName}`,
+      { method: "DELETE" }
     ),
 
   reloadPrompts: () =>

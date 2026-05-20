@@ -6,12 +6,49 @@ from uuid import UUID
 
 import structlog
 
-from backend.agents.fundamental_agent import FundamentalAgent
-from backend.agents.macro_agent import MacroAgent
-from backend.agents.risk_agent import RiskAgent
-from backend.agents.sentiment_agent import SentimentAgent
-from backend.agents.technical_agent import TechnicalAgent
+from backend.agents.base_agent import BaseAgent
 from backend.agents_config_loader import get_agents_config
+
+# Registry of hand-written agent subclasses.  New config-only agents fall back
+# to a dynamically-created BaseAgent subclass and need no file here.
+def _build_subclass_map() -> dict[str, type[BaseAgent]]:
+    registry: dict[str, type[BaseAgent]] = {}
+    try:
+        from backend.agents.technical_agent import TechnicalAgent
+        registry["technical"] = TechnicalAgent
+    except ImportError:
+        pass
+    try:
+        from backend.agents.fundamental_agent import FundamentalAgent
+        registry["fundamental"] = FundamentalAgent
+    except ImportError:
+        pass
+    try:
+        from backend.agents.sentiment_agent import SentimentAgent
+        registry["sentiment"] = SentimentAgent
+    except ImportError:
+        pass
+    try:
+        from backend.agents.risk_agent import RiskAgent
+        registry["risk"] = RiskAgent
+    except ImportError:
+        pass
+    try:
+        from backend.agents.macro_agent import MacroAgent
+        registry["macro"] = MacroAgent
+    except ImportError:
+        pass
+    return registry
+
+_SUBCLASS_MAP: dict[str, type[BaseAgent]] = _build_subclass_map()
+
+
+def _make_agent(name: str, variant_id: str | None) -> BaseAgent:
+    cls = _SUBCLASS_MAP.get(
+        name,
+        type(f"{name.title()}Agent", (BaseAgent,), {"agent_name": name}),
+    )
+    return cls(variant_id)
 from backend.database.redis_client import publish_run_event, set_run_progress, set_run_status
 from backend.orchestrator import chunker, merger
 from backend.schemas.agent_schema import ChunkResult
@@ -140,15 +177,14 @@ class Orchestrator:
         override_variant_id: str,
     ) -> ChunkResult:
         """
-        Level 2: run all 5 agents over this chunk concurrently.
+        Level 2: run all configured agents (excluding CEO) over this chunk concurrently.
         Agent failures are already isolated inside BaseAgent.run().
         """
+        cfg = get_agents_config()
         agents = [
-            TechnicalAgent(override_variant_id),
-            FundamentalAgent(override_variant_id),
-            SentimentAgent(override_variant_id),
-            RiskAgent(override_variant_id),
-            MacroAgent(override_variant_id),
+            _make_agent(name, override_variant_id)
+            for name in cfg.agents
+            if name != "ceo"
         ]
 
         batch_results = await asyncio.gather(

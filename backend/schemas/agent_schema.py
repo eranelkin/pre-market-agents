@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Any, Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 # ── LLM call result (returned by every provider) ──────────────────────────────
@@ -117,6 +117,12 @@ AGENT_OUTPUT_MODELS: dict[str, type] = {
     "macro": MacroAgentOutput,
 }
 
+class GenericAgentOutput(BaseModel):
+    """Fallback output model for custom agents not in the built-in registry."""
+    model_config = ConfigDict(extra="allow")
+    ticker: str
+
+
 # Score field name per agent — used by merger and CEO
 AGENT_SCORE_FIELD: dict[str, str] = {
     "technical": "tech_score",
@@ -125,6 +131,16 @@ AGENT_SCORE_FIELD: dict[str, str] = {
     "risk": "risk_score",
     "macro": "macro_score",
 }
+
+
+def get_agent_output_model(agent_name: str) -> type:
+    """Return the Pydantic output model for an agent; falls back to GenericAgentOutput."""
+    return AGENT_OUTPUT_MODELS.get(agent_name, GenericAgentOutput)
+
+
+def get_agent_score_field(agent_name: str) -> str:
+    """Return the score field name for an agent; falls back to '{name}_score' convention."""
+    return AGENT_SCORE_FIELD.get(agent_name, f"{agent_name}_score")
 
 
 # ── Batch result: full output for one agent across one chunk ──────────────────

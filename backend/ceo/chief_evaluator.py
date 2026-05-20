@@ -8,6 +8,7 @@ import structlog
 import yaml
 
 from backend.ceo import scoring_rubric
+from backend.schemas.agent_schema import get_agent_score_field
 from backend.schemas.result_schema import (
     CEOOutput, FinalResultItem, RedFlag, Top3Pick,
 )
@@ -16,7 +17,6 @@ from backend.utils.prompt_manager import get_prompt_manager
 
 log = structlog.get_logger()
 
-_AGENT_KEYS = ["technical", "fundamental", "sentiment", "risk", "macro"]
 _FENCE_RE = re.compile(r"```(?:yaml)?\s*(.*?)\s*```", re.DOTALL | re.IGNORECASE)
 
 
@@ -101,12 +101,14 @@ class ChiefEvaluator:
     # ── Score enrichment (gives the LLM accurate context) ────────────────────
 
     def _enrich_with_scores(self, ceo_input: list[dict]) -> list[dict]:
+        weights = self._scoring_weights()
         enriched = []
         for stock in ceo_input:
-            tech, fund, sentiment, risk, macro, risk_level, catalyst_type, sentiment_trend = (
-                self._extract_fields(stock)
-            )
-            base = scoring_rubric.weighted_score(tech, fund, sentiment, risk, macro)
+            scores = self._extract_scores(stock, weights)
+            tech = scores.get("technical")
+            fund = scores.get("fundamental")
+            risk_level, catalyst_type, sentiment_trend = self._override_context(stock)
+            base = scoring_rubric.weighted_score(scores, weights)
             adjusted, _, reason = scoring_rubric.apply_overrides(
                 base, risk_level, tech, fund, catalyst_type, sentiment_trend
             )
@@ -134,20 +136,25 @@ class ChiefEvaluator:
         if llm_output:
             llm_items = {item.ticker: item for item in llm_output.stocks}
 
+        weights = self._scoring_weights()
         items: list[FinalResultItem] = []
         for stock in ceo_input:
             ticker = stock["ticker"]
-            tech, fund, sentiment, risk, macro, risk_level, catalyst_type, sentiment_trend = (
-                self._extract_fields(stock)
-            )
+            scores = self._extract_scores(stock, weights)
+            tech = scores.get("technical")
+            fund = scores.get("fundamental")
+            sentiment = scores.get("sentiment")
+            risk = scores.get("risk")
+            macro = scores.get("macro")
+            risk_level, catalyst_type, sentiment_trend = self._override_context(stock)
 
-            base = scoring_rubric.weighted_score(tech, fund, sentiment, risk, macro)
+            base = scoring_rubric.weighted_score(scores, weights)
             final, override, reason = scoring_rubric.apply_overrides(
                 base, risk_level, tech, fund, catalyst_type, sentiment_trend
             )
             rec = scoring_rubric.finalize_recommendation(final, tech, fund)
 
-            agents_present = sum(1 for k in _AGENT_KEYS if k in stock)
+            agents_present = sum(1 for name in weights if scores.get(name) is not None)
             llm_item = llm_items.get(ticker)
 
             items.append(
@@ -156,7 +163,7 @@ class ChiefEvaluator:
                     final_score=final,
                     rank=0,  # assigned after sorting
                     recommendation=rec,
-                    confidence=llm_item.confidence if llm_item else scoring_rubric.compute_confidence(agents_present),
+                    confidence=llm_item.confidence if llm_item else scoring_rubric.compute_confidence(agents_present, len(weights)),
                     technical_score=tech,
                     fundamental_score=fund,
                     sentiment_score=sentiment,
@@ -236,28 +243,33 @@ class ChiefEvaluator:
                 )
         return flags
 
-    # ── Field extraction helper ───────────────────────────────────────────────
+    # ── Extraction helpers ────────────────────────────────────────────────────
 
     @staticmethod
-    def _extract_fields(
-        stock: dict,
-    ) -> tuple[
-        float | None, float | None, float | None,
-        float | None, float | None,
-        str | None, str | None, str | None,
-    ]:
-        t = stock.get("technical") or {}
-        f = stock.get("fundamental") or {}
-        s = stock.get("sentiment") or {}
+    def _scoring_weights() -> dict[str, float]:
+        """Returns {agent_name: weight} for all scored agents (non-CEO, weight > 0)."""
+        from backend.agents_config_loader import get_agents_config
+        cfg = get_agents_config()
+        return {
+            name: agent.weight
+            for name, agent in cfg.agents.items()
+            if name != "ceo" and agent.weight > 0
+        }
+
+    @staticmethod
+    def _extract_scores(stock: dict, weights: dict[str, float]) -> dict[str, float | None]:
+        """Extract numeric score for each scoring agent from the merged stock dict."""
+        result: dict[str, float | None] = {}
+        for name in weights:
+            agent_data = stock.get(name) or {}
+            field = get_agent_score_field(name)
+            val = agent_data.get(field)
+            result[name] = float(val) if val is not None else None
+        return result
+
+    @staticmethod
+    def _override_context(stock: dict) -> tuple[str | None, str | None, str | None]:
+        """Extract the three fields used in override rules (from specific agents)."""
         r = stock.get("risk") or {}
-        m = stock.get("macro") or {}
-        return (
-            t.get("tech_score"),
-            f.get("fund_score"),
-            s.get("sentiment_score"),
-            r.get("risk_score"),
-            m.get("macro_score"),
-            r.get("risk_level"),
-            s.get("catalyst_type"),
-            s.get("sentiment_trend"),
-        )
+        s = stock.get("sentiment") or {}
+        return r.get("risk_level"), s.get("catalyst_type"), s.get("sentiment_trend")

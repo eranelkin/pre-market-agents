@@ -15,34 +15,20 @@ CEO weight breakdown:
 
 from backend.schemas.result_schema import score_to_recommendation
 
-_WEIGHTS: list[tuple[float, float]] = [
-    # (weight, ...)  aligned with (tech, fund, sentiment, risk, macro)
-]
-
-
 def weighted_score(
-    tech: float | None,
-    fund: float | None,
-    sentiment: float | None,
-    risk: float | None,
-    macro: float | None,
+    scores: dict[str, float | None],
+    weights: dict[str, float],
 ) -> float:
     """
-    Compute the base weighted score, normalising for missing agents.
-    Missing agents are omitted from the denominator so absent data
-    doesn't drag the score toward 0.
+    Compute the base weighted score from a dict of agent scores and weights.
+    Missing agents (None values) are omitted from the denominator so absent
+    data doesn't drag the score toward 0.
     Returns a value in [0, 100], rounded to 2 decimal places.
     """
-    agents = [
-        (tech, 0.30),
-        (fund, 0.25),
-        (sentiment, 0.20),
-        (risk, 0.15),
-        (macro, 0.10),
-    ]
     total_score = 0.0
     total_weight = 0.0
-    for value, weight in agents:
+    for agent_name, weight in weights.items():
+        value = scores.get(agent_name)
         if value is not None:
             total_score += value * weight
             total_weight += weight
@@ -114,14 +100,14 @@ def finalize_recommendation(
     return rec
 
 
-def compute_confidence(agents_present: int, total_agents: int = 5) -> float:
+def compute_confidence(agents_present: int, total_agents: int = 0) -> float:
     """
     Rough confidence based on fraction of agents that returned data.
         All 5 present → 0.85
         3–4 present   → 0.65
         1–2 present   → 0.40
     """
-    ratio = agents_present / max(total_agents, 1)
+    ratio = agents_present / max(total_agents or agents_present or 1, 1)
     if ratio >= 1.0:
         return 0.85
     elif ratio >= 0.6:

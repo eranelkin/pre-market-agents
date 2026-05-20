@@ -9,8 +9,8 @@ import yaml
 
 from backend.agents_config_loader import AgentConfig, get_agents_config
 from backend.schemas.agent_schema import (
-    AGENT_OUTPUT_MODELS,
     AgentBatchResult,
+    get_agent_output_model,
 )
 from backend.schemas.input_schema import StockInput
 from backend.tools.base_tool import BaseTool
@@ -222,7 +222,7 @@ class BaseAgent:
         agent's Pydantic output model.  Returns {ticker: validated_dict}.
         Skips individual entries that fail validation (logs a warning).
         """
-        output_model = AGENT_OUTPUT_MODELS[self.agent_name]
+        output_model = get_agent_output_model(self.agent_name)
         raw_list = _parse_yaml_with_repair(content, self.agent_name)
 
         expected = {s.ticker for s in stocks}

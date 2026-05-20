@@ -26,6 +26,7 @@ class ModelVariant(BaseModel):
 
 
 class AgentConfig(BaseModel):
+    weight: float = 0.0  # CEO scoring weight; 0 = not scored (e.g. the CEO agent itself)
     prompt_file: str
     default_variant: str
     fallback_variant: Optional[str] = None
@@ -208,6 +209,26 @@ class AgentsConfigLoader:
         self.save(updated)
         return updated
 
+    def add_agent(self, name: str, agent_cfg: AgentConfig) -> AgentsConfig:
+        with self._lock:
+            cfg = self.config
+            if name in cfg.agents:
+                raise ValueError(f"Agent '{name}' already exists")
+            updated_agents = dict(cfg.agents) | {name: agent_cfg}
+            updated = cfg.model_copy(update={"agents": updated_agents})
+        self.save(updated)
+        return updated
+
+    def remove_agent(self, name: str) -> AgentsConfig:
+        with self._lock:
+            cfg = self.config
+            if name not in cfg.agents:
+                raise KeyError(f"Agent '{name}' not found")
+            updated_agents = {k: v for k, v in cfg.agents.items() if k != name}
+            updated = cfg.model_copy(update={"agents": updated_agents})
+        self.save(updated)
+        return updated
+
     def set_variant_active(self, variant_id: str, active: bool) -> AgentsConfig:
         with self._lock:
             cfg = self.config
@@ -257,3 +278,11 @@ def remove_variant(variant_id: str) -> AgentsConfig:
 
 def set_variant_active(variant_id: str, active: bool) -> AgentsConfig:
     return _loader.set_variant_active(variant_id, active)
+
+
+def add_agent(name: str, agent_cfg: AgentConfig) -> AgentsConfig:
+    return _loader.add_agent(name, agent_cfg)
+
+
+def remove_agent(name: str) -> AgentsConfig:
+    return _loader.remove_agent(name)
