@@ -26,7 +26,9 @@ class ModelVariant(BaseModel):
 
 
 class AgentConfig(BaseModel):
-    weight: float = 0.0  # CEO scoring weight; 0 = not scored (e.g. the CEO agent itself)
+    is_system: bool = False   # orchestrator + CEO: shown in System tab, never deleted or toggled
+    weight: float = 0.0       # CEO scoring weight; 0 = not scored (e.g. the CEO agent itself)
+    active: bool = True       # analysis agents: when False, skipped by the orchestrator
     prompt_file: str
     default_variant: str
     fallback_variant: Optional[str] = None
@@ -37,6 +39,7 @@ class AgentConfig(BaseModel):
 
 
 class PipelineConfig(BaseModel):
+    ceo_autonomous: bool = False  # when True, CEO LLM scores are trusted directly
     chunk_size: int = Field(5, ge=1)
     active_variants: list[str] = Field(default_factory=list)
     compare_when_multiple: bool = True
@@ -229,6 +232,28 @@ class AgentsConfigLoader:
         self.save(updated)
         return updated
 
+    def set_agent_active(self, name: str, active: bool) -> AgentsConfig:
+        with self._lock:
+            cfg = self.config
+            if name not in cfg.agents:
+                raise KeyError(f"Agent '{name}' not found")
+            if cfg.agents[name].is_system:
+                raise ValueError(f"System agent '{name}' cannot be deactivated")
+            updated_agents = dict(cfg.agents)
+            updated_agents[name] = cfg.agents[name].model_copy(update={"active": active})
+            updated = cfg.model_copy(update={"agents": updated_agents})
+        self.save(updated)
+        return updated
+
+    def set_ceo_autonomous(self, enabled: bool) -> AgentsConfig:
+        with self._lock:
+            cfg = self.config
+            updated = cfg.model_copy(update={
+                "pipeline": cfg.pipeline.model_copy(update={"ceo_autonomous": enabled})
+            })
+        self.save(updated)
+        return updated
+
     def set_variant_active(self, variant_id: str, active: bool) -> AgentsConfig:
         with self._lock:
             cfg = self.config
@@ -286,3 +311,11 @@ def add_agent(name: str, agent_cfg: AgentConfig) -> AgentsConfig:
 
 def remove_agent(name: str) -> AgentsConfig:
     return _loader.remove_agent(name)
+
+
+def set_agent_active(name: str, active: bool) -> AgentsConfig:
+    return _loader.set_agent_active(name, active)
+
+
+def set_ceo_autonomous(enabled: bool) -> AgentsConfig:
+    return _loader.set_ceo_autonomous(enabled)

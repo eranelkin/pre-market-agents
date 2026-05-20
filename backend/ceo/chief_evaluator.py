@@ -121,9 +121,97 @@ class ChiefEvaluator:
             enriched.append(entry)
         return enriched
 
-    # ── Programmatic enforcement (always runs, even after LLM) ───────────────
+    # ── Scoring dispatch ──────────────────────────────────────────────────────
 
     def _build_final(
+        self, ceo_input: list[dict], llm_output: CEOOutput | None
+    ) -> CEOOutput:
+        """Route to autonomous or programmatic scoring based on pipeline config."""
+        from backend.agents_config_loader import get_agents_config
+        if get_agents_config().pipeline.ceo_autonomous and llm_output:
+            return self._build_from_llm(llm_output, ceo_input)
+        return self._build_programmatic(ceo_input, llm_output)
+
+    # ── Autonomous mode: trust CEO LLM scores directly ────────────────────────
+
+    def _build_from_llm(
+        self, llm_output: CEOOutput, ceo_input: list[dict]
+    ) -> CEOOutput:
+        """
+        Autonomous mode: use the CEO LLM's final_score, rank, and recommendation
+        directly. Agent scores are still extracted from actual agent outputs for
+        transparency. Falls back to programmatic for any ticker the LLM missed.
+        """
+        weights = self._scoring_weights()
+        llm_items = {item.ticker: item for item in llm_output.stocks}
+        ticker_data = {stock["ticker"]: stock for stock in ceo_input}
+
+        items: list[FinalResultItem] = []
+        for stock in ceo_input:
+            ticker = stock["ticker"]
+            scores = self._extract_scores(stock, weights)
+            llm_item = llm_items.get(ticker)
+
+            if llm_item:
+                items.append(FinalResultItem(
+                    ticker=ticker,
+                    final_score=llm_item.final_score,
+                    rank=0,
+                    recommendation=llm_item.recommendation,
+                    confidence=llm_item.confidence,
+                    technical_score=scores.get("technical"),
+                    fundamental_score=scores.get("fundamental"),
+                    sentiment_score=scores.get("sentiment"),
+                    risk_score=scores.get("risk"),
+                    macro_score=scores.get("macro"),
+                    override_applied=llm_item.override_applied,
+                    override_reason=llm_item.override_reason,
+                    conflicting_signals=llm_item.conflicting_signals,
+                    key_signals=llm_item.key_signals,
+                    ceo_rationale=llm_item.ceo_rationale,
+                ))
+            else:
+                # LLM missed this ticker — fall back to programmatic
+                tech = scores.get("technical")
+                fund = scores.get("fundamental")
+                risk_level, catalyst_type, sentiment_trend = self._override_context(stock)
+                base = scoring_rubric.weighted_score(scores, weights)
+                final, override, reason = scoring_rubric.apply_overrides(
+                    base, risk_level, tech, fund, catalyst_type, sentiment_trend
+                )
+                rec = scoring_rubric.finalize_recommendation(final, tech, fund)
+                agents_present = sum(1 for n in weights if scores.get(n) is not None)
+                items.append(FinalResultItem(
+                    ticker=ticker,
+                    final_score=final,
+                    rank=0,
+                    recommendation=rec,
+                    confidence=scoring_rubric.compute_confidence(agents_present, len(weights)),
+                    technical_score=tech,
+                    fundamental_score=fund,
+                    sentiment_score=scores.get("sentiment"),
+                    risk_score=scores.get("risk"),
+                    macro_score=scores.get("macro"),
+                    override_applied=override,
+                    override_reason=reason,
+                    conflicting_signals=[],
+                    key_signals=None,
+                    ceo_rationale=None,
+                ))
+
+        items.sort(key=lambda x: x.final_score, reverse=True)
+        ranked = [item.model_copy(update={"rank": i + 1}) for i, item in enumerate(items)]
+        top_3 = self._build_top3(ranked, llm_output)
+        red_flags = self._build_red_flags(ranked, ceo_input, llm_output)
+        log.info("ceo_evaluation_complete", stocks_ranked=len(ranked),
+                 top_ticker=ranked[0].ticker if ranked else None,
+                 overrides_applied=sum(1 for r in ranked if r.override_applied),
+                 red_flag_count=len(red_flags), source="llm_autonomous")
+        return CEOOutput(stocks=ranked, top_3_picks=top_3, red_flags=red_flags)
+
+    # ── Programmatic enforcement (always runs, even after LLM) ───────────────
+
+    def _build_programmatic(
         self, ceo_input: list[dict], llm_output: CEOOutput | None
     ) -> CEOOutput:
         """

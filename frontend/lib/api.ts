@@ -168,7 +168,9 @@ export interface PromptInfo {
   content: string;
   last_modified: string | null;
   char_count: number;
-  is_built_in: boolean;
+  is_system: boolean;
+  active: boolean;
+  weight: number;
 }
 
 export interface CreatePromptPayload {
@@ -251,6 +253,12 @@ export const api = {
       { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content }) }
     ),
 
+  togglePromptActive: (agentName: string, active: boolean) =>
+    apiFetch<{ status: string; agent_name: string; active: boolean }>(
+      `/api/v1/prompts/${agentName}/active`,
+      { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active }) }
+    ),
+
   deletePrompt: (agentName: string) =>
     apiFetch<{ status: string; agent_name: string }>(
       `/api/v1/prompts/${agentName}`,
@@ -259,4 +267,14 @@ export const api = {
 
   reloadPrompts: () =>
     apiFetch<{ status: string; agents: Record<string, boolean> }>("/api/v1/prompts/reload", { method: "POST" }),
+
+  // ── Pipeline settings ──────────────────────────────────────────────────────
+  getPipelineSettings: () =>
+    apiFetch<{ ceo_autonomous: boolean; chunk_size: number; compare_when_multiple: boolean }>("/api/v1/pipeline/settings"),
+
+  setCeoAutonomous: (enabled: boolean) =>
+    apiFetch<{ status: string; ceo_autonomous: boolean }>(
+      "/api/v1/pipeline/ceo-autonomous",
+      { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled }) }
+    ),
 };

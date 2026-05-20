@@ -183,8 +183,8 @@ class Orchestrator:
         cfg = get_agents_config()
         agents = [
             _make_agent(name, override_variant_id)
-            for name in cfg.agents
-            if name != "ceo"
+            for name, agent_cfg in cfg.agents.items()
+            if not agent_cfg.is_system and agent_cfg.active
         ]
 
         batch_results = await asyncio.gather(

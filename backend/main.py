@@ -5,7 +5,7 @@ import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.api.routes import compare, health, models, prompts, results, run
+from backend.api.routes import compare, health, models, pipeline, prompts, results, run
 from backend.config import settings
 from backend.providers.registry import get_provider_registry
 from backend.utils.env_manager import read_env_file
@@ -66,3 +66,4 @@ app.include_router(results.router)
 app.include_router(compare.router)
 app.include_router(models.router)
 app.include_router(prompts.router)
+app.include_router(pipeline.router)

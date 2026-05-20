@@ -10,6 +10,7 @@ from backend.agents_config_loader import (
     add_agent,
     get_agents_config,
     remove_agent,
+    set_agent_active,
 )
 from backend.utils.prompt_manager import reload_prompts
 
@@ -18,9 +19,6 @@ router = APIRouter(prefix="/api/v1", tags=["prompts"])
 # backend/api/routes/ → 4 parents up → project root
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
-# Built-in agents that cannot be deleted via the API
-_BUILT_IN_AGENTS = {"technical", "fundamental", "sentiment", "risk", "macro", "ceo"}
-
 _SLUG_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
@@ -28,15 +26,19 @@ class PromptUpdateRequest(BaseModel):
     content: str
 
 
+class PromptActiveRequest(BaseModel):
+    active: bool
+
+
 class PromptCreateRequest(BaseModel):
     agent_name: str = Field(..., pattern=r"^[a-z][a-z0-9_]*$")
     weight: float = Field(..., gt=0, le=1)
     content: str
-    default_variant: str | None = None  # defaults to first active variant
+    default_variant: str | None = None
 
 
-def _read_prompt(name: str, prompt_file: str) -> dict:
-    path = _PROJECT_ROOT / prompt_file
+def _read_prompt(name: str, agent: AgentConfig) -> dict:
+    path = _PROJECT_ROOT / agent.prompt_file
     try:
         content = path.read_text(encoding="utf-8")
         last_modified = datetime.fromtimestamp(
@@ -47,11 +49,13 @@ def _read_prompt(name: str, prompt_file: str) -> dict:
         last_modified = None
     return {
         "agent_name": name,
-        "file_path": prompt_file,
+        "file_path": agent.prompt_file,
         "content": content,
         "last_modified": last_modified,
         "char_count": len(content),
-        "is_built_in": name in _BUILT_IN_AGENTS,
+        "is_system": agent.is_system,
+        "active": agent.active,
+        "weight": agent.weight,
     }
 
 
@@ -59,18 +63,17 @@ def _read_prompt(name: str, prompt_file: str) -> dict:
 async def list_prompts():
     """Return all agent prompts with their current file content."""
     cfg = get_agents_config()
-    return [_read_prompt(name, agent.prompt_file) for name, agent in cfg.agents.items()]
+    return [_read_prompt(name, agent) for name, agent in cfg.agents.items()]
 
 
 @router.post("/prompts", status_code=201)
 async def create_prompt(body: PromptCreateRequest):
-    """Create a new agent: write the .md file and add an entry to agents_config.yaml."""
+    """Create a new custom agent: write the .md file and add an entry to agents_config.yaml."""
     cfg = get_agents_config()
 
     if body.agent_name in cfg.agents:
         raise HTTPException(409, f"Agent '{body.agent_name}' already exists")
 
-    # Resolve default variant
     variant_id = body.default_variant or (
         cfg.pipeline.active_variants[0] if cfg.pipeline.active_variants else None
     )
@@ -94,11 +97,30 @@ async def create_prompt(body: PromptCreateRequest):
             ),
         )
     except Exception as exc:
-        path.unlink(missing_ok=True)  # roll back file write
+        path.unlink(missing_ok=True)
         raise HTTPException(500, f"Failed to update config: {exc}")
 
     reload_prompts()
     return {"status": "created", "agent_name": body.agent_name, "prompt_file": prompt_file}
+
+
+# ── Routes with {agent_name} parameter ───────────────────────────────────────
+# The /active sub-path must be registered before the bare /{agent_name} PATCH
+# so FastAPI doesn't confuse "active" for an agent name on PATCH requests.
+
+@router.patch("/prompts/{agent_name}/active")
+async def toggle_prompt_active(agent_name: str, body: PromptActiveRequest):
+    """Enable or disable an analysis agent in the pipeline."""
+    cfg = get_agents_config()
+    if agent_name not in cfg.agents:
+        raise HTTPException(404, f"Agent '{agent_name}' not found")
+    if cfg.agents[agent_name].is_system:
+        raise HTTPException(400, f"System agent '{agent_name}' cannot be toggled")
+    try:
+        set_agent_active(agent_name, body.active)
+    except (KeyError, ValueError) as exc:
+        raise HTTPException(400, str(exc))
+    return {"status": "updated", "agent_name": agent_name, "active": body.active}
 
 
 @router.get("/prompts/{agent_name}")
@@ -107,7 +129,7 @@ async def get_prompt(agent_name: str):
     cfg = get_agents_config()
     if agent_name not in cfg.agents:
         raise HTTPException(404, f"Agent '{agent_name}' not found")
-    return _read_prompt(agent_name, cfg.agents[agent_name].prompt_file)
+    return _read_prompt(agent_name, cfg.agents[agent_name])
 
 
 @router.patch("/prompts/{agent_name}")
@@ -127,15 +149,14 @@ async def update_prompt(agent_name: str, body: PromptUpdateRequest):
     return {"status": "saved", "agent_name": agent_name, "char_count": len(body.content)}
 
 
-@router.delete("/prompts/{agent_name}", status_code=200)
+@router.delete("/prompts/{agent_name}")
 async def delete_prompt(agent_name: str):
     """Delete a custom agent: remove from config and delete its .md file."""
-    if agent_name in _BUILT_IN_AGENTS:
-        raise HTTPException(400, f"Cannot delete built-in agent '{agent_name}'")
-
     cfg = get_agents_config()
     if agent_name not in cfg.agents:
         raise HTTPException(404, f"Agent '{agent_name}' not found")
+    if cfg.agents[agent_name].is_system:
+        raise HTTPException(400, f"Cannot delete system agent '{agent_name}'")
 
     prompt_file = cfg.agents[agent_name].prompt_file
     remove_agent(agent_name)

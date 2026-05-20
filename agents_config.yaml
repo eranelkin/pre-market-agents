@@ -41,6 +41,16 @@ model_variants:
   model: llama-3.1-70b-versatile
   max_tokens: 4096
 agents:
+  orchestrator:
+    is_system: true
+    weight: 0.0
+    prompt_file: prompts/orchestrator_prompt.md
+    default_variant: claude_sonnet
+    fallback_variant: gemini_flash
+    max_tokens: 2000
+    timeout_seconds: 60
+    enable_web_search: false
+    enable_deep_search: false
   technical:
     weight: 0.30
     prompt_file: prompts/technical_prompt.md
@@ -87,6 +97,7 @@ agents:
     enable_web_search: true
     enable_deep_search: false
   ceo:
+    is_system: true
     weight: 0.0
     prompt_file: prompts/ceo_prompt.md
     default_variant: claude_sonnet
@@ -96,6 +107,7 @@ agents:
     enable_web_search: false
     enable_deep_search: false
 pipeline:
+  ceo_autonomous: false
   chunk_size: 5
   active_variants:
   - llama_groq
