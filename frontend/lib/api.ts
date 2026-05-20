@@ -162,6 +162,14 @@ export interface TestConnectionResult {
   message: string | null;
 }
 
+export interface PromptInfo {
+  agent_name: string;
+  file_path: string;
+  content: string;
+  last_modified: string | null;
+  char_count: number;
+}
+
 export interface ModelsResponse {
   variants: VariantDetail[];
   providers: Record<string, { api_key_env: string; base_url: string | null; supports_tool_use: boolean; supports_built_in_search: boolean }>;
@@ -219,4 +227,16 @@ export const api = {
 
   testVariant: (id: string) =>
     apiFetch<TestConnectionResult>(`/api/v1/models/variants/${id}/test`, { method: "POST" }),
+
+  // ── Prompt management ─────────────────────────────────────────────────────
+  listPrompts: () => apiFetch<PromptInfo[]>("/api/v1/prompts"),
+
+  updatePrompt: (agentName: string, content: string) =>
+    apiFetch<{ status: string; agent_name: string; char_count: number }>(
+      `/api/v1/prompts/${agentName}`,
+      { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content }) }
+    ),
+
+  reloadPrompts: () =>
+    apiFetch<{ status: string; agents: Record<string, boolean> }>("/api/v1/prompts/reload", { method: "POST" }),
 };
