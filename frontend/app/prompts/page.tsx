@@ -44,7 +44,9 @@ function EditModal({
 
   useEffect(() => {
     textareaRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
@@ -68,20 +70,43 @@ function EditModal({
       <div className="w-full max-w-2xl rounded-xl border border-[#2a2a2a] bg-[#111111] shadow-2xl flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#2a2a2a]">
-          <h2 className="text-base font-semibold" style={{ color: TEXT }}>Edit Prompt</h2>
-          <button onClick={onClose} style={{ color: TEXT }} className="opacity-60 hover:opacity-100 transition-opacity">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 6 6 18M6 6l12 12"/>
+          <h2 className="text-base font-semibold" style={{ color: TEXT }}>
+            Edit Prompt
+          </h2>
+          <button
+            onClick={onClose}
+            style={{ color: TEXT }}
+            className="opacity-60 hover:opacity-100 transition-opacity"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M18 6 6 18M6 6l12 12" />
             </svg>
           </button>
         </div>
 
         {/* Body */}
         <div className="px-6 py-5 flex flex-col gap-4 overflow-y-auto">
-          <p className="text-sm font-medium" style={{ color: TEXT }}>{label(prompt.agent_name)}</p>
+          <p className="text-sm font-medium" style={{ color: TEXT }}>
+            {label(prompt.agent_name)}
+          </p>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs uppercase tracking-wider" style={{ color: TEXT, opacity: 0.6 }}>Prompt text</label>
+            <label
+              className="text-xs uppercase tracking-wider"
+              style={{ color: TEXT, opacity: 0.6 }}
+            >
+              Prompt text
+            </label>
             <textarea
               ref={textareaRef}
               value={draft}
@@ -122,21 +147,47 @@ function EditModal({
 
 function PencilIcon() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
     </svg>
   );
 }
 
 function TrashIcon() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
     </svg>
   );
 }
 
-function DeleteCell({ agentName, onDeleted }: { agentName: string; onDeleted: () => void }) {
+function DeleteCell({
+  agentName,
+  onDeleted,
+}: {
+  agentName: string;
+  onDeleted: () => void;
+}) {
   const [confirm, setConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -146,16 +197,28 @@ function DeleteCell({ agentName, onDeleted }: { agentName: string; onDeleted: ()
         <button
           onClick={async () => {
             setLoading(true);
-            try { await api.deletePrompt(agentName); onDeleted(); }
-            catch (e) { alert(e instanceof Error ? e.message : String(e)); setConfirm(false); }
-            finally { setLoading(false); }
+            try {
+              await api.deletePrompt(agentName);
+              onDeleted();
+            } catch (e) {
+              alert(e instanceof Error ? e.message : String(e));
+              setConfirm(false);
+            } finally {
+              setLoading(false);
+            }
           }}
           disabled={loading}
           className="text-red-400 underline disabled:opacity-50"
         >
           {loading ? "…" : "Confirm"}
         </button>
-        <button onClick={() => setConfirm(false)} style={{ color: TEXT }} className="opacity-60 underline">Cancel</button>
+        <button
+          onClick={() => setConfirm(false)}
+          style={{ color: TEXT }}
+          className="opacity-60 underline"
+        >
+          Cancel
+        </button>
       </span>
     );
   }
@@ -164,7 +227,7 @@ function DeleteCell({ agentName, onDeleted }: { agentName: string; onDeleted: ()
     <button
       onClick={() => setConfirm(true)}
       style={{ color: TEXT }}
-      className="opacity-40 hover:opacity-100 hover:text-red-400 transition-all"
+      className="hover:text-red-400 transition-all"
       title="Delete agent"
     >
       <TrashIcon />
@@ -174,34 +237,64 @@ function DeleteCell({ agentName, onDeleted }: { agentName: string; onDeleted: ()
 
 // ── System table ──────────────────────────────────────────────────────────────
 
-function SystemTable({ prompts, onEdit }: { prompts: PromptInfo[]; onEdit: (p: PromptInfo) => void }) {
+function SystemTable({
+  prompts,
+  onEdit,
+}: {
+  prompts: PromptInfo[];
+  onEdit: (p: PromptInfo) => void;
+}) {
   return (
     <div className="rounded-lg border border-[#2a2a2a] overflow-hidden">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-[#2a2a2a]" style={{ backgroundColor: "#111111" }}>
-            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider w-44" style={{ color: TEXT, opacity: 0.5 }}>Agent</th>
-            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: TEXT, opacity: 0.5 }}>Prompt</th>
-            <th className="text-right px-4 py-3 text-xs font-semibold uppercase tracking-wider w-24" style={{ color: TEXT, opacity: 0.5 }}>Actions</th>
+          <tr
+            className="border-b border-[#2a2a2a]"
+            style={{ backgroundColor: "#111111" }}
+          >
+            <th
+              className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider w-44"
+              style={{ color: TEXT }}
+            >
+              Agent
+            </th>
+            <th
+              className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
+              style={{ color: TEXT }}
+            >
+              Prompt
+            </th>
+            <th
+              className="text-right px-4 py-3 text-xs font-semibold uppercase tracking-wider w-24"
+              style={{ color: TEXT }}
+            >
+              Actions
+            </th>
           </tr>
         </thead>
         <tbody>
-          {prompts.map((p, i) => (
+          {prompts.map((p) => (
             <tr
               key={p.agent_name}
               className="border-b border-[#2a2a2a] last:border-0 hover:bg-[#111111] transition-colors"
             >
-              <td className="px-4 py-3 font-medium whitespace-nowrap" style={{ color: TEXT }}>
+              <td
+                className="px-4 py-3 font-medium whitespace-nowrap"
+                style={{ color: TEXT }}
+              >
                 {label(p.agent_name)}
               </td>
-              <td className="px-4 py-3 font-mono text-xs max-w-0 w-full" style={{ color: TEXT, opacity: 0.5 }}>
+              <td
+                className="px-4 py-3 font-mono text-xs max-w-0 w-full"
+                style={{ color: TEXT }}
+              >
                 <span className="block truncate">{truncate(p.content)}</span>
               </td>
               <td className="px-4 py-3 text-right">
                 <button
                   onClick={() => onEdit(p)}
                   style={{ color: TEXT }}
-                  className="opacity-40 hover:opacity-100 transition-opacity"
+                  className="transition-opacity"
                   title="Edit prompt"
                 >
                   <PencilIcon />
@@ -245,7 +338,9 @@ function AgentsTable({
   if (prompts.length === 0) {
     return (
       <div className="rounded-lg border border-[#2a2a2a] px-6 py-10 text-center">
-        <p className="text-sm" style={{ color: TEXT, opacity: 0.5 }}>No custom agents yet. Click &quot;+ New Agent&quot; to create one.</p>
+        <p className="text-sm" style={{ color: TEXT, opacity: 0.5 }}>
+          No custom agents yet. Click &quot;+ New Agent&quot; to create one.
+        </p>
       </div>
     );
   }
@@ -254,11 +349,34 @@ function AgentsTable({
     <div className="rounded-lg border border-[#2a2a2a] overflow-hidden">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-[#2a2a2a]" style={{ backgroundColor: "#111111" }}>
-            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider w-44" style={{ color: TEXT, opacity: 0.5 }}>Agent</th>
-            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: TEXT, opacity: 0.5 }}>Prompt</th>
-            <th className="text-center px-4 py-3 text-xs font-semibold uppercase tracking-wider w-24" style={{ color: TEXT, opacity: 0.5 }}>Active</th>
-            <th className="text-right px-4 py-3 text-xs font-semibold uppercase tracking-wider w-24" style={{ color: TEXT, opacity: 0.5 }}>Actions</th>
+          <tr
+            className="border-b border-[#2a2a2a]"
+            style={{ backgroundColor: "#111111" }}
+          >
+            <th
+              className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider w-44"
+              style={{ color: TEXT }}
+            >
+              Agent
+            </th>
+            <th
+              className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
+              style={{ color: TEXT }}
+            >
+              Prompt
+            </th>
+            <th
+              className="text-center px-4 py-3 text-xs font-semibold uppercase tracking-wider w-24"
+              style={{ color: TEXT }}
+            >
+              Active
+            </th>
+            <th
+              className="text-right px-4 py-3 text-xs font-semibold uppercase tracking-wider w-24"
+              style={{ color: TEXT }}
+            >
+              Actions
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -267,13 +385,21 @@ function AgentsTable({
               key={p.agent_name}
               className="border-b border-[#2a2a2a] last:border-0 hover:bg-[#111111] transition-colors"
             >
-              <td className="px-4 py-3 whitespace-nowrap" style={{ color: TEXT }}>
+              <td
+                className="px-4 py-3 whitespace-nowrap"
+                style={{ color: TEXT }}
+              >
                 <span className="font-medium">{label(p.agent_name)}</span>
                 {!p.is_system && (
-                  <span className="ml-2 rounded-full bg-purple-500/20 text-purple-400 text-xs px-1.5 py-0.5">custom</span>
+                  <span className="ml-2 rounded-full bg-purple-500/20 text-purple-400 text-xs px-1.5 py-0.5">
+                    custom
+                  </span>
                 )}
               </td>
-              <td className="px-4 py-3 font-mono text-xs max-w-0 w-full" style={{ color: TEXT, opacity: 0.5 }}>
+              <td
+                className="px-4 py-3 font-mono text-xs max-w-0 w-full"
+                style={{ color: TEXT }}
+              >
                 <span className="block truncate">{truncate(p.content)}</span>
               </td>
               <td className="px-4 py-3 text-center">
@@ -294,7 +420,10 @@ function AgentsTable({
                     <PencilIcon />
                   </button>
                   {!p.is_system && (
-                    <DeleteCell agentName={p.agent_name} onDeleted={onDeleted} />
+                    <DeleteCell
+                      agentName={p.agent_name}
+                      onDeleted={onDeleted}
+                    />
                   )}
                 </div>
               </td>
@@ -314,7 +443,8 @@ function CeoAutonomousPanel() {
   const [toggling, setToggling] = useState(false);
 
   useEffect(() => {
-    api.getPipelineSettings()
+    api
+      .getPipelineSettings()
       .then((s) => setEnabled(s.ceo_autonomous))
       .finally(() => setLoading(false));
   }, []);
@@ -335,17 +465,28 @@ function CeoAutonomousPanel() {
   return (
     <div className="rounded-lg border border-[#2a2a2a] px-5 py-4 flex items-start justify-between gap-6">
       <div className="space-y-1">
-        <p className="text-sm font-medium" style={{ color: TEXT }}>CEO Autonomous Scoring</p>
-        <p className="text-xs leading-relaxed" style={{ color: TEXT, opacity: 0.55 }}>
-          When <span className="font-semibold">ON</span>, the CEO LLM decides all scores and rankings directly based on its own expertise.{" "}
-          When <span className="font-semibold">OFF</span>, scores are computed from the fixed agent weights below.
+        <p className="text-sm font-medium" style={{ color: TEXT }}>
+          CEO Autonomous Scoring
+        </p>
+        <p
+          className="text-xs leading-relaxed"
+          style={{ color: TEXT, opacity: 0.8 }}
+        >
+          When <span className="font-semibold">ON</span>, the CEO LLM decides
+          all scores and rankings directly based on its own expertise. When{" "}
+          <span className="font-semibold">OFF</span>, scores are computed from
+          the fixed agent weights below.
         </p>
       </div>
       <div className="shrink-0 pt-0.5">
         {loading ? (
           <div className="w-9 h-5 rounded-full bg-[#2a2a2a] animate-pulse" />
         ) : (
-          <Switch checked={enabled} disabled={toggling} onCheckedChange={toggle} />
+          <Switch
+            checked={enabled}
+            disabled={toggling}
+            onCheckedChange={toggle}
+          />
         )}
       </div>
     </div>
@@ -362,7 +503,13 @@ const PLACEHOLDER = `You are a custom analysis agent. For each stock in the inpu
 
 Return only valid YAML. No explanation.`;
 
-function CreateDialog({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+function CreateDialog({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: () => void;
+}) {
   const [name, setName] = useState("");
   const [weight, setWeight] = useState("");
   const [content, setContent] = useState(PLACEHOLDER);
@@ -377,7 +524,11 @@ function CreateDialog({ onClose, onCreated }: { onClose: () => void; onCreated: 
     setError(null);
     setSaving(true);
     try {
-      const payload: CreatePromptPayload = { agent_name: name, weight: weightNum, content: content.trim() };
+      const payload: CreatePromptPayload = {
+        agent_name: name,
+        weight: weightNum,
+        content: content.trim(),
+      };
       await api.createPrompt(payload);
       onCreated();
     } catch (e) {
@@ -391,42 +542,85 @@ function CreateDialog({ onClose, onCreated }: { onClose: () => void; onCreated: 
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
       <div className="w-full max-w-2xl rounded-xl border border-[#2a2a2a] bg-[#111111] shadow-2xl flex flex-col max-h-[90vh]">
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#2a2a2a]">
-          <h2 className="text-base font-semibold" style={{ color: TEXT }}>New Agent</h2>
-          <button onClick={onClose} style={{ color: TEXT }} className="opacity-60 hover:opacity-100 transition-opacity">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          <h2 className="text-base font-semibold" style={{ color: TEXT }}>
+            New Agent
+          </h2>
+          <button
+            onClick={onClose}
+            style={{ color: TEXT }}
+            className="opacity-60 hover:opacity-100 transition-opacity"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
           </button>
         </div>
 
         <div className="overflow-y-auto px-6 py-5 space-y-5">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs uppercase tracking-wider" style={{ color: TEXT, opacity: 0.6 }}>Agent name *</label>
+              <label
+                className="text-xs uppercase tracking-wider"
+                style={{ color: TEXT, opacity: 0.6 }}
+              >
+                Agent name *
+              </label>
               <input
                 value={name}
-                onChange={(e) => setName(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
+                onChange={(e) =>
+                  setName(
+                    e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""),
+                  )
+                }
                 placeholder="e.g. momentum"
                 className="w-full rounded-md border border-[#2a2a2a] bg-[#0a0a0a] px-3 py-2 text-sm font-mono outline-none focus:border-blue-500 transition-colors"
                 style={{ color: TEXT }}
               />
-              <p className="text-xs opacity-50" style={{ color: TEXT }}>Score field: <code>{name || "name"}_score</code></p>
+              <p className="text-xs opacity-50" style={{ color: TEXT }}>
+                Score field: <code>{name || "name"}_score</code>
+              </p>
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs uppercase tracking-wider" style={{ color: TEXT, opacity: 0.6 }}>Weight (0–1) *</label>
+              <label
+                className="text-xs uppercase tracking-wider"
+                style={{ color: TEXT, opacity: 0.6 }}
+              >
+                Weight (0–1) *
+              </label>
               <input
                 type="number"
                 value={weight}
                 onChange={(e) => setWeight(e.target.value)}
                 placeholder="0.10"
-                min="0.01" max="1" step="0.01"
+                min="0.01"
+                max="1"
+                step="0.01"
                 className="w-full rounded-md border border-[#2a2a2a] bg-[#0a0a0a] px-3 py-2 text-sm font-mono outline-none focus:border-blue-500 transition-colors"
                 style={{ color: TEXT }}
               />
-              <p className="text-xs opacity-50" style={{ color: TEXT }}>CEO scoring contribution</p>
+              <p className="text-xs opacity-50" style={{ color: TEXT }}>
+                CEO scoring contribution
+              </p>
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs uppercase tracking-wider" style={{ color: TEXT, opacity: 0.6 }}>Prompt content *</label>
+            <label
+              className="text-xs uppercase tracking-wider"
+              style={{ color: TEXT, opacity: 0.6 }}
+            >
+              Prompt content *
+            </label>
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
@@ -441,8 +635,18 @@ function CreateDialog({ onClose, onCreated }: { onClose: () => void; onCreated: 
         </div>
 
         <div className="flex justify-end gap-2 px-6 py-4 border-t border-[#2a2a2a]">
-          <button onClick={onClose} className="px-4 py-2 text-sm rounded-md border border-[#2a2a2a] hover:bg-[#1a1a1a] transition-colors" style={{ color: TEXT }}>Cancel</button>
-          <button onClick={submit} disabled={!canSubmit || saving} className="px-4 py-2 text-sm rounded-md bg-blue-600 hover:bg-blue-500 text-white transition-colors disabled:opacity-50">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm rounded-md border border-[#2a2a2a] hover:bg-[#1a1a1a] transition-colors"
+            style={{ color: TEXT }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={submit}
+            disabled={!canSubmit || saving}
+            className="px-4 py-2 text-sm rounded-md bg-blue-600 hover:bg-blue-500 text-white transition-colors disabled:opacity-50"
+          >
             {saving ? "Creating…" : "Create Agent"}
           </button>
         </div>
@@ -453,7 +657,13 @@ function CreateDialog({ onClose, onCreated }: { onClose: () => void; onCreated: 
 
 // ── Inner tab switcher ────────────────────────────────────────────────────────
 
-function InnerTabs({ active, onChange }: { active: string; onChange: (t: string) => void }) {
+function InnerTabs({
+  active,
+  onChange,
+}: {
+  active: string;
+  onChange: (t: string) => void;
+}) {
   return (
     <div className="flex gap-1 border-b border-[#2a2a2a] pb-0">
       {["System", "Agents"].map((t) => (
@@ -466,7 +676,7 @@ function InnerTabs({ active, onChange }: { active: string; onChange: (t: string)
               ? "border-blue-500 text-blue-400"
               : "border-transparent hover:border-[#2a2a2a]",
           ].join(" ")}
-          style={{ color: active === t ? undefined : TEXT, opacity: active === t ? 1 : 0.6 }}
+          style={{ color: active === t ? undefined : TEXT }}
         >
           {t}
         </button>
@@ -497,25 +707,35 @@ export default function PromptsPage() {
     }
   }, []);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   // Optimistic toggle — update local state without a full refresh
   const handleToggle = (name: string, active: boolean) => {
-    setPrompts((prev) => prev.map((p) => p.agent_name === name ? { ...p, active } : p));
+    setPrompts((prev) =>
+      prev.map((p) => (p.agent_name === name ? { ...p, active } : p)),
+    );
   };
 
   const systemPrompts = prompts.filter((p) => p.is_system);
   const agentPrompts = prompts.filter((p) => !p.is_system);
 
   return (
-    <main className="min-h-screen bg-background">
-      <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">
+    <main className="fixed inset-0 top-12 bg-background flex flex-col overflow-hidden">
+      <div className="max-w-5xl w-full mx-auto px-6 py-8 flex flex-col flex-1 min-h-0 gap-6">
         {/* Page header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between shrink-0">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight" style={{ color: TEXT }}>Prompts</h1>
-            <p className="text-sm mt-1" style={{ color: TEXT, opacity: 0.55 }}>
-              Manage AI agent prompts. Changes are written to disk and hot-reloaded immediately.
+            <h1
+              className="text-2xl font-bold tracking-tight"
+              style={{ color: TEXT }}
+            >
+              Prompts
+            </h1>
+            <p className="text-sm mt-1" style={{ color: TEXT }}>
+              Manage AI agent prompts. Changes are written to disk and
+              hot-reloaded immediately.
             </p>
           </div>
           <button
@@ -526,37 +746,56 @@ export default function PromptsPage() {
           </button>
         </div>
 
-        {error && <p className="text-sm text-red-400">{error}</p>}
-        {loading && <p className="text-sm animate-pulse" style={{ color: TEXT, opacity: 0.5 }}>Loading prompts…</p>}
+        {error && <p className="text-sm text-red-400 shrink-0">{error}</p>}
+        {loading && (
+          <p
+            className="text-sm animate-pulse shrink-0"
+            style={{ color: TEXT, opacity: 0.5 }}
+          >
+            Loading prompts…
+          </p>
+        )}
 
         {/* Inner tabs */}
-        <div className="space-y-5">
+        <div className="flex flex-col flex-1 min-h-0 gap-5">
           <InnerTabs active={innerTab} onChange={setInnerTab} />
 
-          {innerTab === "System" && (
-            <div className="space-y-5">
-              <CeoAutonomousPanel />
-              <SystemTable prompts={systemPrompts} onEdit={setEditing} />
-            </div>
-          )}
+          <div className="table-container flex-1 overflow-y-auto min-h-0">
+            {innerTab === "System" && (
+              <div className="space-y-5">
+                <CeoAutonomousPanel />
+                <SystemTable prompts={systemPrompts} onEdit={setEditing} />
+              </div>
+            )}
 
-          {innerTab === "Agents" && (
-            <AgentsTable
-              prompts={agentPrompts}
-              onEdit={setEditing}
-              onDeleted={refresh}
-              onToggle={handleToggle}
-            />
-          )}
+            {innerTab === "Agents" && (
+              <AgentsTable
+                prompts={agentPrompts}
+                onEdit={setEditing}
+                onDeleted={refresh}
+                onToggle={handleToggle}
+              />
+            )}
+          </div>
         </div>
       </div>
 
       {editing && (
-        <EditModal prompt={editing} onClose={() => setEditing(null)} onSaved={refresh} />
+        <EditModal
+          prompt={editing}
+          onClose={() => setEditing(null)}
+          onSaved={refresh}
+        />
       )}
 
       {showCreate && (
-        <CreateDialog onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); refresh(); }} />
+        <CreateDialog
+          onClose={() => setShowCreate(false)}
+          onCreated={() => {
+            setShowCreate(false);
+            refresh();
+          }}
+        />
       )}
     </main>
   );

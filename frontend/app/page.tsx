@@ -7,7 +7,12 @@ import { ModelVariantSelector } from "@/components/ModelVariantSelector";
 import { PipelineStatus } from "@/components/PipelineStatus";
 import { StatusBadge } from "@/components/StatusBadge";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -36,7 +41,9 @@ export default function Home() {
     }
   };
 
-  useEffect(() => { fetchRuns(); }, []);
+  useEffect(() => {
+    fetchRuns();
+  }, []);
 
   const onStarted = (resp: StartRunResponse) => {
     setActiveRunIds(Object.values(resp.run_ids));
@@ -52,22 +59,36 @@ export default function Home() {
     <main className="min-h-screen bg-background">
       <div className="max-w-6xl mx-auto p-6 space-y-6">
         <header>
-          <h1 className="text-3xl font-bold tracking-tight">Pre-Market Advisor</h1>
-          <p className="text-muted-foreground mt-1">Daily AI-powered stock ranking pipeline</p>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Pre-Market Advisor
+          </h1>
+          <p className="mt-1" style={{ color: "#D7DFE7" }}>
+            Daily AI-powered stock ranking pipeline
+          </p>
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="md:col-span-2 space-y-4">
             <RunTrigger onStarted={onStarted} />
             {activeRunIds.map((id) => (
-              <PipelineStatus key={id} runId={id} onComplete={onPipelineComplete} />
+              <PipelineStatus
+                key={id}
+                runId={id}
+                onComplete={onPipelineComplete}
+              />
             ))}
             {activeSessionId && activeRunIds.length > 0 && (
               <div className="flex gap-3">
-                <Link href={`/results/${activeRunIds[0]}`} className="text-sm text-primary underline">
+                <Link
+                  href={`/results/${activeRunIds[0]}`}
+                  className="text-sm text-primary underline"
+                >
                   View results
                 </Link>
-                <Link href={`/compare/${activeSessionId}`} className="text-sm text-primary underline">
+                <Link
+                  href={`/compare/${activeSessionId}`}
+                  className="text-sm text-primary underline"
+                >
                   View comparison
                 </Link>
               </div>
@@ -102,19 +123,37 @@ export default function Home() {
                   <TableBody>
                     {runs.map((r) => (
                       <TableRow key={r.run_id}>
-                        <TableCell className="font-mono text-sm">{r.process_id}</TableCell>
-                        <TableCell className="font-mono text-sm">{r.model_variant_id}</TableCell>
-                        <TableCell><StatusBadge status={r.status} /></TableCell>
-                        <TableCell className="text-right">{r.total_stocks}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{fmtDate(r.started_at)}</TableCell>
-                        <TableCell className="text-right text-sm">{fmtDuration(r.duration_seconds)}</TableCell>
+                        <TableCell className="font-mono text-sm">
+                          {r.process_id}
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">
+                          {r.model_variant_id}
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge status={r.status} />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {r.total_stocks}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {fmtDate(r.started_at)}
+                        </TableCell>
+                        <TableCell className="text-right text-sm">
+                          {fmtDuration(r.duration_seconds)}
+                        </TableCell>
                         <TableCell>
                           {r.status === "complete" && (
                             <div className="flex gap-2">
-                              <Link href={`/results/${r.run_id}`} className="text-xs text-primary underline">
+                              <Link
+                                href={`/results/${r.run_id}`}
+                                className="text-xs text-primary underline"
+                              >
                                 Results
                               </Link>
-                              <Link href={`/compare/${r.session_id}`} className="text-xs text-primary underline">
+                              <Link
+                                href={`/compare/${r.session_id}`}
+                                className="text-xs text-primary underline"
+                              >
                                 Compare
                               </Link>
                             </div>

@@ -23,11 +23,12 @@ export function NavBar() {
             <Link
               key={href}
               href={href}
-              className={`px-3 py-1.5 text-sm rounded transition-colors ${
-                active
-                  ? "bg-accent text-foreground font-medium"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
-              }`}
+              className="px-3 py-1.5 text-sm rounded transition-colors"
+              style={{
+                color: active ? "#60a5fa" : "#D7DFE7",
+                backgroundColor: active ? "rgba(96, 165, 250, 0.12)" : "transparent",
+                fontWeight: active ? 500 : 400,
+              }}
             >
               {label}
             </Link>

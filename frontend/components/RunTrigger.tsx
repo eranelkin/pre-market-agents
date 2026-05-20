@@ -70,7 +70,7 @@ export function RunTrigger({ onStarted }: Props) {
           {file ? (
             <p className="text-sm font-medium">{file.name}</p>
           ) : (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm" style={{ color: "#D7DFE7" }}>
               Drag & drop a <span className="font-mono">.json</span> or <span className="font-mono">.yaml</span> stock file here, or click to browse
             </p>
           )}
