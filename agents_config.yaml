@@ -40,10 +40,16 @@ model_variants:
   provider: groq
   model: llama-3.1-70b-versatile
   max_tokens: 4096
+- id: llama_3_3_70b
+  label: LLaMA 3.3 70B (Groq)
+  provider: groq
+  model: llama-3.3-70b-versatile
+  max_tokens: 4096
 agents:
   orchestrator:
     is_system: true
     weight: 0.0
+    active: true
     prompt_file: prompts/orchestrator_prompt.md
     default_variant: claude_sonnet
     fallback_variant: gemini_flash
@@ -52,7 +58,9 @@ agents:
     enable_web_search: false
     enable_deep_search: false
   technical:
-    weight: 0.30
+    is_system: false
+    weight: 0.3
+    active: true
     prompt_file: prompts/technical_prompt.md
     default_variant: claude_sonnet
     fallback_variant: gemini_flash
@@ -61,7 +69,9 @@ agents:
     enable_web_search: false
     enable_deep_search: false
   fundamental:
+    is_system: false
     weight: 0.25
+    active: false
     prompt_file: prompts/fundamental_prompt.md
     default_variant: claude_sonnet
     fallback_variant: gemini_flash
@@ -70,7 +80,9 @@ agents:
     enable_web_search: false
     enable_deep_search: false
   sentiment:
-    weight: 0.20
+    is_system: false
+    weight: 0.2
+    active: false
     prompt_file: prompts/sentiment_prompt.md
     default_variant: claude_sonnet
     fallback_variant: gemini_flash
@@ -79,7 +91,9 @@ agents:
     enable_web_search: true
     enable_deep_search: false
   risk:
+    is_system: false
     weight: 0.15
+    active: false
     prompt_file: prompts/risk_prompt.md
     default_variant: claude_sonnet
     fallback_variant: gemini_flash
@@ -88,7 +102,9 @@ agents:
     enable_web_search: false
     enable_deep_search: false
   macro:
-    weight: 0.10
+    is_system: false
+    weight: 0.1
+    active: false
     prompt_file: prompts/macro_prompt.md
     default_variant: claude_sonnet
     fallback_variant: gemini_flash
@@ -99,6 +115,7 @@ agents:
   ceo:
     is_system: true
     weight: 0.0
+    active: true
     prompt_file: prompts/ceo_prompt.md
     default_variant: claude_sonnet
     fallback_variant: gemini_flash
@@ -110,7 +127,7 @@ pipeline:
   ceo_autonomous: false
   chunk_size: 5
   active_variants:
-  - llama_groq
+  - llama_3_3_70b
   compare_when_multiple: true
 search:
   provider: tavily

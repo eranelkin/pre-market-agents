@@ -192,7 +192,10 @@ export default function ModelsPage() {
 
   return (
     <main className="bg-background">
-      <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
+      <div
+        className="max-w-7xl mx-auto px-6 py-8 space-y-6"
+        style={{ maxWidth: "80%" }}
+      >
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>

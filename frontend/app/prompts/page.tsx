@@ -723,7 +723,10 @@ export default function PromptsPage() {
 
   return (
     <main className="fixed inset-0 top-12 bg-background flex flex-col overflow-hidden">
-      <div className="max-w-5xl w-full mx-auto px-6 py-8 flex flex-col flex-1 min-h-0 gap-6">
+      <div
+        className="max-w-5xl w-full mx-auto px-6 py-8 flex flex-col flex-1 min-h-0 gap-6"
+        style={{ maxWidth: "80%" }}
+      >
         {/* Page header */}
         <div className="flex items-center justify-between shrink-0">
           <div>

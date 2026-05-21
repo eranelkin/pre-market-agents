@@ -6,6 +6,7 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "
   running: "secondary",
   pending: "outline",
   failed: "destructive",
+  cancelled: "outline",
 };
 
 const RECOMMENDATION_COLOR: Record<string, string> = {
@@ -17,8 +18,12 @@ const RECOMMENDATION_COLOR: Record<string, string> = {
 };
 
 export function StatusBadge({ status }: { status: string }) {
+  const isActive = status === "pending" || status === "running";
   return (
-    <Badge variant={STATUS_VARIANT[status] ?? "outline"}>
+    <Badge
+      variant={STATUS_VARIANT[status] ?? "outline"}
+      className={isActive ? "animate-pulse" : ""}
+    >
       {status}
     </Badge>
   );

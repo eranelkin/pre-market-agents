@@ -193,7 +193,7 @@ async def list_runs(
 
 # ── SSE stream ────────────────────────────────────────────────────────────────
 
-_TERMINAL = frozenset({"complete", "failed"})
+_TERMINAL = frozenset({"complete", "failed", "cancelled"})
 _HEARTBEAT_SECS = 15.0
 
 
@@ -285,6 +285,54 @@ async def stream_run_status(run_id: uuid.UUID):
     )
 
 
+# ── POST /api/v1/run/{run_id}/cancel ─────────────────────────────────────────
+
+@router.post("/run/{run_id}/cancel", status_code=200)
+async def cancel_run(
+    run_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Mark a pending/running run as cancelled and publish SSE event to close streams."""
+    run = await db.get(RunORM, run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    if run.status in _TERMINAL:
+        raise HTTPException(status_code=409, detail=f"Run already terminal: {run.status}")
+
+    await db.execute(
+        RunORM.__table__.update()
+        .where(RunORM.run_id == run_id)
+        .where(RunORM.status.notin_(_TERMINAL))
+        .values(status="cancelled", completed_at=datetime.now(timezone.utc))
+    )
+    await db.commit()
+
+    await publish_run_event(
+        str(run_id),
+        {"type": "progress", "stage": "cancelled", "status": "cancelled"},
+    )
+    log.info("run_cancelled", run_id=str(run_id))
+    return {"status": "cancelled", "run_id": str(run_id)}
+
+
+# ── DELETE /api/v1/run/{run_id} ───────────────────────────────────────────────
+
+@router.delete("/run/{run_id}", status_code=200)
+async def delete_run(
+    run_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Hard-delete a run and all its cascaded data (batches, agent_results, final_results)."""
+    run = await db.get(RunORM, run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    await db.delete(run)
+    await db.commit()
+    log.info("run_deleted", run_id=str(run_id))
+    return {"status": "deleted", "run_id": str(run_id)}
+
+
 # ── Background task ───────────────────────────────────────────────────────────
 
 async def _pipeline_task(
@@ -293,6 +341,16 @@ async def _pipeline_task(
     process_id: str,
     variant_run_ids: dict[str, uuid.UUID],
 ):
+    # Immediately mark all runs as "running" so SSE DB-polling sees a live status.
+    async with AsyncSessionLocal() as db:
+        for run_id in variant_run_ids.values():
+            await db.execute(
+                RunORM.__table__.update()
+                .where(RunORM.run_id == run_id)
+                .values(status="running")
+            )
+        await db.commit()
+
     try:
         runner = VariantRunner()
         result = await runner.run(
@@ -317,6 +375,7 @@ async def _pipeline_task(
                 await db.execute(
                     RunORM.__table__.update()
                     .where(RunORM.run_id == run_id)
+                    .where(RunORM.status != "cancelled")
                     .values(
                         status="failed",
                         error_message=str(exc)[:500],
@@ -373,6 +432,7 @@ async def _persist_variant(
     await db.execute(
         RunORM.__table__.update()
         .where(RunORM.run_id == vr.run_id)
+        .where(RunORM.status != "cancelled")
         .values(
             status="complete",
             provider_used=provider_used,

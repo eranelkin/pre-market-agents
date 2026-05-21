@@ -10,8 +10,13 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
-  Tooltip, ResponsiveContainer,
+  RadarChart,
+  Radar,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Tooltip,
+  ResponsiveContainer,
 } from "recharts";
 
 function ScoreRadar({ row }: { row: RunResults["results"][number] }) {
@@ -28,7 +33,12 @@ function ScoreRadar({ row }: { row: RunResults["results"][number] }) {
         <PolarGrid />
         <PolarAngleAxis dataKey="subject" tick={{ fontSize: 12 }} />
         <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
-        <Radar dataKey="value" stroke="#6366f1" fill="#6366f1" fillOpacity={0.3} />
+        <Radar
+          dataKey="value"
+          stroke="#6366f1"
+          fill="#6366f1"
+          fillOpacity={0.3}
+        />
         <Tooltip />
       </RadarChart>
     </ResponsiveContainer>
@@ -43,31 +53,43 @@ export default function ResultsPage() {
 
   useEffect(() => {
     if (!runId) return;
-    api.getResults(runId)
+    api
+      .getResults(runId)
       .then(setData)
       .catch((e) => setError(e.message));
   }, [runId]);
 
-  if (error) return (
-    <main className="max-w-4xl mx-auto p-6">
-      <Link href="/" className="text-sm text-primary underline">← Back</Link>
-      <p className="mt-4 text-destructive">{error}</p>
-    </main>
-  );
+  if (error)
+    return (
+      <main className="max-w-4xl mx-auto p-6">
+        <Link href="/" className="text-sm text-primary underline">
+          ← Back
+        </Link>
+        <p className="mt-4 text-destructive">{error}</p>
+      </main>
+    );
 
-  if (!data) return (
-    <main className="max-w-4xl mx-auto p-6">
-      <p className="text-muted-foreground">Loading results…</p>
-    </main>
-  );
+  if (!data)
+    return (
+      <main className="max-w-4xl mx-auto p-6">
+        <p className="text-muted-foreground">Loading results…</p>
+      </main>
+    );
 
-  const selectedRow = selectedTicker ? data.results.find((r) => r.ticker === selectedTicker) : null;
+  const selectedRow = selectedTicker
+    ? data.results.find((r) => r.ticker === selectedTicker)
+    : null;
 
   return (
     <main className="min-h-screen bg-background">
-      <div className="max-w-6xl mx-auto p-6 space-y-6">
+      <div
+        className="max-w-6xl mx-auto p-6 space-y-6"
+        style={{ maxWidth: "80%" }}
+      >
         <div className="flex items-center gap-4">
-          <Link href="/" className="text-sm text-primary underline">← Back</Link>
+          <Link href="/" className="text-sm text-primary underline">
+            ← Back
+          </Link>
           <h1 className="text-2xl font-bold">Results</h1>
           <StatusBadge status="complete" />
         </div>
@@ -81,7 +103,9 @@ export default function ResultsPage() {
           <span>·</span>
           <span>{data.total_stocks} stocks</span>
           <span>·</span>
-          <a href={api.exportCsv(runId)} className="text-primary underline">Download CSV</a>
+          <a href={api.exportCsv(runId)} className="text-primary underline">
+            Download CSV
+          </a>
         </div>
 
         {data.top_3_picks.length > 0 && (
@@ -94,7 +118,9 @@ export default function ResultsPage() {
         {data.red_flags.length > 0 && (
           <Card className="border-destructive/40">
             <CardHeader>
-              <CardTitle className="text-base text-destructive">Red Flags</CardTitle>
+              <CardTitle className="text-base text-destructive">
+                Red Flags
+              </CardTitle>
             </CardHeader>
             <CardContent className="flex flex-wrap gap-2">
               {data.red_flags.map((f) => (
@@ -108,14 +134,19 @@ export default function ResultsPage() {
 
         <section>
           <h2 className="text-lg font-semibold mb-3">All Rankings</h2>
-          <ResultsTable results={data.results} onSelectTicker={setSelectedTicker} />
+          <ResultsTable
+            results={data.results}
+            onSelectTicker={setSelectedTicker}
+          />
         </section>
 
         {selectedRow && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">{selectedRow.ticker} — Score Breakdown</CardTitle>
+                <CardTitle className="text-base">
+                  {selectedRow.ticker} — Score Breakdown
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <ScoreRadar row={selectedRow} />
@@ -127,7 +158,9 @@ export default function ResultsPage() {
                 {selectedRow.conflicting_signals.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-1">
                     {selectedRow.conflicting_signals.map((s, i) => (
-                      <Badge key={i} variant="outline" className="text-xs">{s}</Badge>
+                      <Badge key={i} variant="outline" className="text-xs">
+                        {s}
+                      </Badge>
                     ))}
                   </div>
                 )}

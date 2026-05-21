@@ -186,6 +186,30 @@ export interface ModelsResponse {
   active_variants: string[];
 }
 
+export interface AuditEntry {
+  result_id: string;
+  run_id: string;
+  session_id: string;
+  model_variant_id: string;
+  agent_name: string;
+  ticker: string;
+  provider_used: string | null;
+  model_used: string | null;
+  was_fallback: boolean;
+  web_search_used: boolean;
+  tokens_used: number | null;
+  latency_ms: number | null;
+  raw_prompt: string | null;
+  raw_response: string | null;
+  parsed_output: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface AuditResponse {
+  total: number;
+  entries: AuditEntry[];
+}
+
 export const api = {
   listRuns: (page = 1, pageSize = 20) =>
     apiFetch<RunSummary[]>(`/api/v1/runs?page=${page}&page_size=${pageSize}`),
@@ -207,6 +231,12 @@ export const api = {
     form.append("file", file);
     return apiFetch<StartRunResponse>("/api/v1/run", { method: "POST", body: form });
   },
+
+  cancelRun: (runId: string) =>
+    apiFetch<{ status: string; run_id: string }>(`/api/v1/run/${runId}/cancel`, { method: "POST" }),
+
+  deleteRun: (runId: string) =>
+    apiFetch<{ status: string; run_id: string }>(`/api/v1/run/${runId}`, { method: "DELETE" }),
 
   exportCsv: (runId: string) =>
     `${BASE}/api/v1/run/${runId}/results/export`,
@@ -267,6 +297,25 @@ export const api = {
 
   reloadPrompts: () =>
     apiFetch<{ status: string; agents: Record<string, boolean> }>("/api/v1/prompts/reload", { method: "POST" }),
+
+  // ── Audit log ─────────────────────────────────────────────────────────────
+  getAuditLog: (params: {
+    run_id?: string;
+    agent_name?: string;
+    ticker?: string;
+    status?: string;
+    limit?: number;
+    offset?: number;
+  }) => {
+    const qs = new URLSearchParams(
+      Object.fromEntries(
+        Object.entries(params)
+          .filter(([, v]) => v != null && v !== "")
+          .map(([k, v]) => [k, String(v)])
+      )
+    ).toString();
+    return apiFetch<AuditResponse>(`/api/v1/audit${qs ? `?${qs}` : ""}`);
+  },
 
   // ── Pipeline settings ──────────────────────────────────────────────────────
   getPipelineSettings: () =>

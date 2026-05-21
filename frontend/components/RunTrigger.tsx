@@ -6,9 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface Props {
   onStarted: (resp: StartRunResponse) => void;
+  compact?: boolean;
 }
 
-export function RunTrigger({ onStarted }: Props) {
+export function RunTrigger({ onStarted, compact }: Props) {
   const [dragging, setDragging] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
@@ -45,36 +46,56 @@ export function RunTrigger({ onStarted }: Props) {
     }
   };
 
+  const dropZone = (
+    <div
+      className={`border-2 border-dashed rounded-lg text-center cursor-pointer transition-colors ${
+        compact ? "px-4 py-2" : "p-8"
+      } ${
+        dragging ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
+      }`}
+      onClick={() => inputRef.current?.click()}
+      onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={onDrop}
+    >
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".json,.yaml,.yml"
+        className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) accept(f); }}
+      />
+      {file ? (
+        <p className={`font-medium ${compact ? "text-xs" : "text-sm"}`}>{file.name}</p>
+      ) : (
+        <p className={compact ? "text-xs" : "text-sm"} style={{ color: "#D7DFE7" }}>
+          {compact
+            ? "Drop .json/.yaml or click to browse"
+            : <>Drag & drop a <span className="font-mono">.json</span> or <span className="font-mono">.yaml</span> stock file here, or click to browse</>}
+        </p>
+      )}
+    </div>
+  );
+
+  if (compact) {
+    return (
+      <div className="min-w-[220px] space-y-2">
+        {dropZone}
+        {error && <p className="text-xs text-destructive">{error}</p>}
+        <Button size="sm" onClick={onSubmit} disabled={!file || loading} className="w-full">
+          {loading ? "Starting…" : "Run Analysis"}
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Upload Stock File</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div
-          className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-            dragging ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
-          }`}
-          onClick={() => inputRef.current?.click()}
-          onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={onDrop}
-        >
-          <input
-            ref={inputRef}
-            type="file"
-            accept=".json,.yaml,.yml"
-            className="hidden"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) accept(f); }}
-          />
-          {file ? (
-            <p className="text-sm font-medium">{file.name}</p>
-          ) : (
-            <p className="text-sm" style={{ color: "#D7DFE7" }}>
-              Drag & drop a <span className="font-mono">.json</span> or <span className="font-mono">.yaml</span> stock file here, or click to browse
-            </p>
-          )}
-        </div>
+        {dropZone}
         {error && <p className="text-sm text-destructive">{error}</p>}
         <Button onClick={onSubmit} disabled={!file || loading} className="w-full">
           {loading ? "Starting…" : "Run Analysis"}

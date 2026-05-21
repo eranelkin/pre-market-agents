@@ -11,11 +11,38 @@ interface Props {
 
 const TERMINAL = new Set(["complete", "failed"]);
 
+const STAGE_LABEL: Record<string, string> = {
+  pending: "Waiting to start…",
+  running: "Agents analyzing stocks…",
+  agents_running: "Agents analyzing stocks…",
+  ceo_evaluating: "CEO scoring and ranking…",
+  complete: "Done",
+  failed: "Failed",
+};
+
+function fmtElapsed(s: number) {
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return m ? `${m}m ${sec}s` : `${sec}s`;
+}
+
 export function PipelineStatus({ runId, onComplete }: Props) {
   const [status, setStatus] = useState<RunStatus | null>(null);
+  const [elapsed, setElapsed] = useState(0);
   const esRef = useRef<EventSource | null>(null);
   const doneRef = useRef(false);
+  const mountedAt = useRef(Date.now());
 
+  // Elapsed timer — ticks every second until terminal
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (doneRef.current) return;
+      setElapsed(Math.floor((Date.now() - mountedAt.current) / 1000));
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  // SSE subscription
   useEffect(() => {
     if (doneRef.current) return;
 
@@ -47,8 +74,8 @@ export function PipelineStatus({ runId, onComplete }: Props) {
     es.onerror = () => {
       es.close();
       if (doneRef.current) return;
-      // One fallback poll on error, then stop
-      api.getRunStatus(runId)
+      api
+        .getRunStatus(runId)
         .then((s) => {
           setStatus(s);
           if (TERMINAL.has(s.status)) {
@@ -65,39 +92,78 @@ export function PipelineStatus({ runId, onComplete }: Props) {
     };
   }, [runId, onComplete]);
 
-  if (!status) return <p className="text-sm text-muted-foreground">Connecting…</p>;
+  // Initial connecting state
+  if (!status) {
+    return (
+      <Card>
+        <CardContent className="py-4">
+          <div className="flex items-center gap-2">
+            <span className="inline-block h-2 w-2 rounded-full bg-blue-400 animate-ping" />
+            <span className="text-sm text-muted-foreground">Connecting to pipeline…</span>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const p = status.progress;
+  const isActive = !TERMINAL.has(status.status);
+  const stage = p?.stage ?? status.status;
+  const stageLabel = STAGE_LABEL[stage] ?? stage;
+  const progressPct = p?.total_chunks ? (p.chunks_completed / p.total_chunks) * 100 : 0;
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          Pipeline Status
-          <StatusBadge status={status.status} />
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center justify-between text-base">
+          <span className="flex items-center gap-2">
+            Pipeline
+            <StatusBadge status={status.status} />
+          </span>
+          {isActive && (
+            <span className="text-xs font-mono font-normal text-muted-foreground">
+              ⏱ {fmtElapsed(elapsed)}
+            </span>
+          )}
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-2">
+
+      <CardContent className="space-y-3">
         <p className="text-sm text-muted-foreground">
-          Variant: <span className="font-mono text-foreground">{status.model_variant_id}</span>
+          Variant:{" "}
+          <span className="font-mono text-foreground">{status.model_variant_id}</span>
+          {p?.total_stocks != null && (
+            <span className="ml-3">· {p.total_stocks} stocks</span>
+          )}
         </p>
-        {p && (
-          <>
-            <div className="w-full bg-secondary rounded-full h-2">
+
+        {/* Progress bar */}
+        <div className="space-y-1.5">
+          <div className="w-full bg-secondary rounded-full h-1.5 overflow-hidden">
+            {p ? (
               <div
-                className="bg-primary h-2 rounded-full transition-all"
-                style={{ width: `${p.total_chunks ? (p.chunks_completed / p.total_chunks) * 100 : 0}%` }}
+                className="bg-primary h-1.5 rounded-full transition-all duration-500"
+                style={{ width: `${progressPct}%` }}
               />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Chunks: {p.chunks_completed}/{p.total_chunks}
-              &nbsp;·&nbsp;
-              Stocks: {p.total_stocks}
-              &nbsp;·&nbsp;
-              Stage: {p.stage}
-            </p>
-          </>
-        )}
+            ) : isActive ? (
+              // Indeterminate pulsing bar when no Redis progress data
+              <div className="bg-primary/60 h-1.5 rounded-full w-3/5 animate-pulse" />
+            ) : (
+              <div className="bg-primary h-1.5 rounded-full w-full" />
+            )}
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            {p ? (
+              <>
+                Chunks {p.chunks_completed}/{p.total_chunks} · {stageLabel}
+              </>
+            ) : (
+              <span className={isActive ? "animate-pulse" : ""}>{stageLabel}</span>
+            )}
+          </p>
+        </div>
+
         {status.error_message && (
           <p className="text-sm text-destructive">{status.error_message}</p>
         )}
