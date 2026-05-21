@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { BarChart2, ClipboardList, GitCompare, Trash2, X } from "lucide-react";
 import { api, RunSummary, StartRunResponse } from "@/lib/api";
 import { RunTrigger } from "@/components/RunTrigger";
 import { ModelVariantSelector } from "@/components/ModelVariantSelector";
@@ -14,9 +15,79 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 
 const TERMINAL = new Set(["complete", "failed", "cancelled"]);
+
+const STAGE_LABEL: Record<string, string> = {
+  pending: "Waiting to start…",
+  running: "Starting up…",
+  agents_running: "Agents analyzing…",
+  ceo_evaluating: "CEO scoring…",
+  complete: "Done",
+  failed: "Failed",
+  cancelled: "Cancelled",
+};
+
+function ProgressCell({ runId }: { runId: string }) {
+  const [info, setInfo] = useState<{
+    stage: string;
+    chunksCompleted: number;
+    totalChunks: number;
+    agentNames?: string[];
+  } | null>(null);
+
+  useEffect(() => {
+    const es = new EventSource(api.sseUrl(runId));
+    es.onmessage = (ev) => {
+      try {
+        const p = JSON.parse(ev.data);
+        const stage: string | undefined = p.stage ?? p.status;
+        setInfo({
+          stage: stage ?? "running",
+          chunksCompleted: p.chunks_completed ?? 0,
+          totalChunks: p.total_chunks ?? 0,
+          agentNames: p.agent_names,
+        });
+        if (stage && TERMINAL.has(stage)) es.close();
+      } catch {
+        /* ignore malformed */
+      }
+    };
+    es.onerror = () => es.close();
+    return () => es.close();
+  }, [runId]);
+
+  const stage = info?.stage ?? "running";
+  const label = STAGE_LABEL[stage] ?? stage;
+  const hasFraction = (info?.totalChunks ?? 0) > 0;
+  const pct = hasFraction
+    ? Math.round((info!.chunksCompleted / info!.totalChunks) * 100)
+    : 0;
+  const agents = info?.agentNames;
+
+  return (
+    <div className="space-y-1 min-w-[180px]">
+      <div className="w-full bg-secondary rounded-full h-1.5 overflow-hidden">
+        {hasFraction ? (
+          <div
+            className="bg-primary h-1.5 rounded-full transition-all duration-500"
+            style={{ width: `${pct}%` }}
+          />
+        ) : (
+          <div className="bg-primary/60 h-1.5 rounded-full w-3/5 animate-pulse" />
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground leading-tight">
+        {label}
+        {hasFraction &&
+          ` · ${info!.chunksCompleted}/${info!.totalChunks} chunks`}
+        {agents?.length && stage === "agents_running"
+          ? ` [${agents.join(", ")}]`
+          : ""}
+      </p>
+    </div>
+  );
+}
 
 function fmtDuration(s: number | null) {
   if (s == null) return "—";
@@ -125,7 +196,7 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-background">
+    <main className="bg-background">
       <div
         className="max-w-6xl mx-auto p-6 space-y-6"
         style={{ maxWidth: "80%" }}
@@ -175,10 +246,26 @@ export default function Home() {
                 <TableBody>
                   {runs.map((r) => {
                     const isActive = !TERMINAL.has(r.status);
+                    const sessionRunCount = runs.filter(
+                      (x) => x.session_id === r.session_id,
+                    ).length;
                     return (
-                      <TableRow key={r.run_id}>
+                      <TableRow
+                        key={r.run_id}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#2C2D33")}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "")}
+                      >
                         <TableCell className="font-mono text-sm">
-                          {r.process_id}
+                          {r.status === "complete" ? (
+                            <Link
+                              href={`/results/${r.run_id}`}
+                              className="hover:text-blue-300 transition-colors"
+                            >
+                              {r.process_id}
+                            </Link>
+                          ) : (
+                            r.process_id
+                          )}
                         </TableCell>
                         <TableCell className="font-mono text-sm">
                           {r.model_variant_id}
@@ -189,7 +276,10 @@ export default function Home() {
                         <TableCell className="text-right">
                           {r.total_stocks}
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
+                        <TableCell
+                          className="text-sm text-muted-foreground"
+                          style={{ color: "#4184F4" }}
+                        >
                           {fmtDate(r.started_at)}
                         </TableCell>
                         <TableCell className="text-right text-sm font-mono">
@@ -197,47 +287,54 @@ export default function Home() {
                             ? fmtDuration(elapsedMap[r.run_id] ?? 0)
                             : fmtDuration(r.duration_seconds)}
                         </TableCell>
-                        <TableCell className="min-w-[120px]">
-                          {isActive && (
-                            <div className="w-full bg-secondary rounded-full h-1.5 overflow-hidden">
-                              <div className="bg-primary/60 h-1.5 rounded-full w-3/5 animate-pulse" />
-                            </div>
-                          )}
-                        </TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-2 justify-end">
+                          {isActive && <ProgressCell runId={r.run_id} />}
+                        </TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center gap-1 justify-end">
                             {r.status === "complete" && (
                               <>
                                 <Link
                                   href={`/results/${r.run_id}`}
-                                  className="text-xs text-primary underline"
+                                  title="Results"
+                                  className="inline-flex items-center justify-center w-7 h-7 rounded hover:bg-[#2C2D33] text-blue-400 hover:text-blue-300 transition-colors"
                                 >
-                                  Results
+                                  <BarChart2 size={15} />
                                 </Link>
+                                {sessionRunCount > 1 && (
+                                  <Link
+                                    href={`/compare/${r.session_id}`}
+                                    title="Compare"
+                                    className="inline-flex items-center justify-center w-7 h-7 rounded hover:bg-[#2C2D33] text-blue-400 hover:text-blue-300 transition-colors"
+                                  >
+                                    <GitCompare size={15} />
+                                  </Link>
+                                )}
                                 <Link
-                                  href={`/compare/${r.session_id}`}
-                                  className="text-xs text-primary underline"
+                                  href={`/audit?run_id=${r.run_id}`}
+                                  title="Audit"
+                                  className="inline-flex items-center justify-center w-7 h-7 rounded hover:bg-[#2C2D33] text-muted-foreground hover:text-foreground transition-colors"
                                 >
-                                  Compare
+                                  <ClipboardList size={15} />
                                 </Link>
                               </>
                             )}
                             {isActive && (
-                              <Button
-                                size="xs"
-                                variant="outline"
+                              <button
+                                title="Cancel"
                                 onClick={() => handleCancel(r.run_id)}
+                                className="inline-flex items-center justify-center w-7 h-7 rounded hover:bg-[#2C2D33] text-muted-foreground hover:text-foreground transition-colors"
                               >
-                                Cancel
-                              </Button>
+                                <X size={15} />
+                              </button>
                             )}
-                            <Button
-                              size="xs"
-                              variant="destructive"
+                            <button
+                              title="Delete"
                               onClick={() => handleDelete(r.run_id, isActive)}
+                              className="inline-flex items-center justify-center w-7 h-7 rounded hover:bg-red-500/15 text-muted-foreground hover:text-red-400 transition-colors"
                             >
-                              Delete
-                            </Button>
+                              <Trash2 size={15} />
+                            </button>
                           </div>
                         </TableCell>
                       </TableRow>

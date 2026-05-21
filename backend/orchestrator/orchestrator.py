@@ -49,6 +49,8 @@ def _make_agent(name: str, variant_id: str | None) -> BaseAgent:
         type(f"{name.title()}Agent", (BaseAgent,), {"agent_name": name}),
     )
     return cls(variant_id)
+from backend.database.connection import AsyncSessionLocal
+from backend.database.models import Run as RunORM
 from backend.database.redis_client import publish_run_event, set_run_progress, set_run_status
 from backend.orchestrator import chunker, merger
 from backend.schemas.agent_schema import ChunkResult
@@ -56,6 +58,9 @@ from backend.schemas.input_schema import StockInput
 from backend.schemas.result_schema import CEOOutput
 
 log = structlog.get_logger()
+
+_DB_STAGE_WRITABLE = frozenset({"agents_running", "ceo_evaluating"})
+_TERMINAL = frozenset({"complete", "failed", "cancelled"})
 
 
 @dataclass
@@ -82,6 +87,21 @@ async def _set_progress(
     }
     await set_run_progress(str(run_id), payload)
     await publish_run_event(str(run_id), {"type": "progress", **payload})
+
+    # Mirror intermediate stages to DB so the SSE DB-polling fallback (no Redis)
+    # shows real progress instead of a permanent "running" status.
+    if stage in _DB_STAGE_WRITABLE:
+        try:
+            async with AsyncSessionLocal() as _db:
+                await _db.execute(
+                    RunORM.__table__.update()
+                    .where(RunORM.run_id == run_id)
+                    .where(RunORM.status.notin_(_TERMINAL))
+                    .values(status=stage)
+                )
+                await _db.commit()
+        except Exception as exc:
+            log.warning("progress_db_write_failed", run_id=str(run_id), stage=stage, error=str(exc))
 
 
 class Orchestrator:
@@ -187,14 +207,28 @@ class Orchestrator:
             if not agent_cfg.is_system and agent_cfg.active
         ]
 
-        batch_results = await asyncio.gather(
-            *[agent.run(chunk, run_id, batch_id) for agent in agents]
+        # Publish which agents are starting so the frontend can show meaningful progress.
+        await publish_run_event(str(run_id), {
+            "type": "progress",
+            "stage": "agents_running",
+            "agent_names": [a.agent_name for a in agents],
+            "tickers": [s.ticker for s in chunk],
+        })
+
+        raw_results = await asyncio.gather(
+            *[agent.run(chunk, run_id, batch_id) for agent in agents],
+            return_exceptions=True,
         )
 
-        agent_results = {r.agent_name: r for r in batch_results}
+        agent_results = {}
+        for r in raw_results:
+            if isinstance(r, BaseException):
+                log.error("agent_gather_exception", batch_id=str(batch_id), error=str(r))
+            else:
+                agent_results[r.agent_name] = r
         failed_agents = [
             name for name, r in agent_results.items() if not r.parsed_output
-        ]
+        ] + [a.agent_name for a in agents if a.agent_name not in agent_results]
 
         if failed_agents:
             log.warning(

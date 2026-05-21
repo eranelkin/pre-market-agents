@@ -45,6 +45,11 @@ model_variants:
   provider: groq
   model: llama-3.3-70b-versatile
   max_tokens: 4096
+- id: gemini_2_flash
+  label: Gemini 2.0 Flash (Google)
+  provider: google
+  model: gemini-2.0-flash-exp
+  max_tokens: 4096
 agents:
   orchestrator:
     is_system: true
@@ -65,18 +70,18 @@ agents:
     default_variant: claude_sonnet
     fallback_variant: gemini_flash
     max_tokens: 2000
-    timeout_seconds: 45
+    timeout_seconds: 60
     enable_web_search: false
     enable_deep_search: false
   fundamental:
     is_system: false
     weight: 0.25
-    active: false
+    active: true
     prompt_file: prompts/fundamental_prompt.md
     default_variant: claude_sonnet
     fallback_variant: gemini_flash
     max_tokens: 2000
-    timeout_seconds: 45
+    timeout_seconds: 60
     enable_web_search: false
     enable_deep_search: false
   sentiment:
@@ -87,7 +92,7 @@ agents:
     default_variant: claude_sonnet
     fallback_variant: gemini_flash
     max_tokens: 2000
-    timeout_seconds: 45
+    timeout_seconds: 60
     enable_web_search: true
     enable_deep_search: false
   risk:
@@ -98,7 +103,7 @@ agents:
     default_variant: claude_sonnet
     fallback_variant: gemini_flash
     max_tokens: 2000
-    timeout_seconds: 45
+    timeout_seconds: 60
     enable_web_search: false
     enable_deep_search: false
   macro:
@@ -109,7 +114,7 @@ agents:
     default_variant: claude_sonnet
     fallback_variant: gemini_flash
     max_tokens: 2000
-    timeout_seconds: 45
+    timeout_seconds: 60
     enable_web_search: true
     enable_deep_search: false
   ceo:
@@ -120,7 +125,7 @@ agents:
     default_variant: claude_sonnet
     fallback_variant: gemini_flash
     max_tokens: 8000
-    timeout_seconds: 120
+    timeout_seconds: 180
     enable_web_search: false
     enable_deep_search: false
 pipeline:

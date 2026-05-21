@@ -36,7 +36,12 @@ class KeySignals(BaseModel):
 class FinalResultItem(BaseModel):
     ticker: str
     final_score: float = Field(..., ge=0, le=100)
-    rank: int = Field(..., ge=1)
+    rank: int = Field(..., ge=0)
+
+    @field_validator("rank", mode="before")
+    @classmethod
+    def clamp_rank(cls, v: int) -> int:
+        return max(1, int(v))
     recommendation: str
     confidence: float = Field(..., ge=0, le=1)
     technical_score: Optional[float] = Field(None, ge=0, le=100)

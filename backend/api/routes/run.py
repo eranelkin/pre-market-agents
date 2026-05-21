@@ -353,14 +353,17 @@ async def _pipeline_task(
 
     try:
         runner = VariantRunner()
-        result = await runner.run(
-            stocks=stocks,
-            session_id=session_id,
-            process_id=process_id,
-            variant_run_ids=variant_run_ids,
+        result = await asyncio.wait_for(
+            runner.run(
+                stocks=stocks,
+                session_id=session_id,
+                process_id=process_id,
+                variant_run_ids=variant_run_ids,
+            ),
+            timeout=900.0,  # 15-minute hard ceiling — catches any provider hang that escapes agent-level timeouts
         )
         async with AsyncSessionLocal() as db:
-            await _persist_results(db, session_id, result)
+            await _persist_results(db, session_id, result, variant_run_ids)
             await db.commit()
         log.info("pipeline_task_complete", session_id=str(session_id))
     except Exception as exc:
@@ -394,11 +397,28 @@ async def _persist_results(
     db: AsyncSession,
     session_id: uuid.UUID,
     result: VariantRunnerResult,
+    variant_run_ids: dict[str, uuid.UUID],
 ) -> None:
     now = datetime.now(timezone.utc)
+    succeeded_run_ids = {vr.run_id for vr in result.variant_results}
 
     for vr in result.variant_results:
         await _persist_variant(db, session_id, vr, now)
+
+    # Any variant that was not persisted (failed inside VariantRunner) must be
+    # marked failed so the SSE DB-polling fallback exits its loop.
+    for run_id in variant_run_ids.values():
+        if run_id not in succeeded_run_ids:
+            await db.execute(
+                RunORM.__table__.update()
+                .where(RunORM.run_id == run_id)
+                .where(RunORM.status.notin_(_TERMINAL))
+                .values(status="failed", completed_at=now)
+            )
+            await publish_run_event(
+                str(run_id),
+                {"type": "progress", "stage": "failed", "status": "failed"},
+            )
 
     if result.comparison:
         await _persist_comparison(db, session_id, result.comparison, now)

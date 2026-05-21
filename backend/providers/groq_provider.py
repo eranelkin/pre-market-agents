@@ -24,7 +24,9 @@ class GroqProvider(BaseProvider):
 
     def __init__(self, api_key: str) -> None:
         from groq import AsyncGroq
-        self._client = AsyncGroq(api_key=api_key)
+        # Explicit HTTP timeout prevents the SDK from hanging indefinitely when
+        # Groq is slow or unresponsive (asyncio cancellation alone is unreliable).
+        self._client = AsyncGroq(api_key=api_key, timeout=30.0)
 
     async def complete(
         self,
