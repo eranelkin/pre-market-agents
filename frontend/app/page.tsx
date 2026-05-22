@@ -252,8 +252,12 @@ export default function Home() {
                     return (
                       <TableRow
                         key={r.run_id}
-                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#2C2D33")}
-                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "")}
+                        onMouseEnter={(e) =>
+                          (e.currentTarget.style.backgroundColor = "#2C2D33")
+                        }
+                        onMouseLeave={(e) =>
+                          (e.currentTarget.style.backgroundColor = "")
+                        }
                       >
                         <TableCell className="font-mono text-sm">
                           {r.status === "complete" ? (
