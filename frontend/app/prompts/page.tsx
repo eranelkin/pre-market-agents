@@ -1,6 +1,12 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, CreatePromptPayload, PromptInfo } from "@/lib/api";
+import {
+  api,
+  ChildPromptInfo,
+  CreateChildPromptPayload,
+  CreatePromptPayload,
+  PromptInfo,
+} from "@/lib/api";
 import { Switch } from "@/components/ui/switch";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -33,7 +39,7 @@ function EditModal({
   onClose,
   onSaved,
 }: {
-  prompt: PromptInfo;
+  prompt: { agent_name: string; content: string };
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -181,6 +187,61 @@ function TrashIcon() {
   );
 }
 
+function PlusIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 20 20"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      {/* Dark outer ring */}
+      <circle cx="10" cy="10" r="10" fill="#1a1a1a" />
+      {/* Blue fill */}
+      <circle cx="10" cy="10" r="8.5" fill="#2196F3" />
+      {/* White inner ring gap */}
+      <circle
+        cx="10"
+        cy="10"
+        r="7"
+        fill="#2196F3"
+        stroke="white"
+        strokeWidth="0.8"
+      />
+      {/* White plus */}
+      <path
+        d="M10 5.5V14.5M5.5 10H14.5"
+        stroke="white"
+        strokeWidth="2.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function ChevronIcon({ open }: { open: boolean }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="13"
+      height="13"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{
+        transform: open ? "rotate(90deg)" : "rotate(0deg)",
+        transition: "transform 0.15s ease",
+      }}
+    >
+      <path d="m9 18 6-6-6-6" />
+    </svg>
+  );
+}
+
 function DeleteCell({
   agentName,
   onDeleted,
@@ -242,7 +303,7 @@ function SystemTable({
   onEdit,
 }: {
   prompts: PromptInfo[];
-  onEdit: (p: PromptInfo) => void;
+  onEdit: (p: { agent_name: string; content: string }) => void;
 }) {
   return (
     <div className="rounded-lg border border-[#2a2a2a] overflow-hidden">
@@ -315,13 +376,22 @@ function AgentsTable({
   onEdit,
   onDeleted,
   onToggle,
+  onChildToggle,
+  onAddChild,
 }: {
   prompts: PromptInfo[];
-  onEdit: (p: PromptInfo) => void;
+  onEdit: (p: { agent_name: string; content: string }) => void;
   onDeleted: () => void;
   onToggle: (name: string, active: boolean) => void;
+  onChildToggle: (
+    parentName: string,
+    childName: string,
+    active: boolean,
+  ) => void;
+  onAddChild: (parentName: string) => void;
 }) {
   const [toggling, setToggling] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const handleToggle = async (p: PromptInfo) => {
     setToggling(p.agent_name);
@@ -333,6 +403,30 @@ function AgentsTable({
     } finally {
       setToggling(null);
     }
+  };
+
+  const handleChildToggle = async (
+    parentName: string,
+    child: ChildPromptInfo,
+  ) => {
+    setToggling(child.agent_name);
+    try {
+      await api.togglePromptActive(child.agent_name, !child.active);
+      onChildToggle(parentName, child.agent_name, !child.active);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e));
+    } finally {
+      setToggling(null);
+    }
+  };
+
+  const toggleExpand = (name: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
   };
 
   if (prompts.length === 0) {
@@ -353,6 +447,7 @@ function AgentsTable({
             className="border-b border-[#2a2a2a]"
             style={{ backgroundColor: "#111111" }}
           >
+            <th className="w-6 px-2 py-3" />
             <th
               className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider w-44"
               style={{ color: TEXT }}
@@ -372,7 +467,7 @@ function AgentsTable({
               Active
             </th>
             <th
-              className="text-right px-4 py-3 text-xs font-semibold uppercase tracking-wider w-24"
+              className="text-right px-4 py-3 text-xs font-semibold uppercase tracking-wider w-32"
               style={{ color: TEXT }}
             >
               Actions
@@ -381,53 +476,151 @@ function AgentsTable({
         </thead>
         <tbody>
           {prompts.map((p) => (
-            <tr
-              key={p.agent_name}
-              className="border-b border-[#2a2a2a] last:border-0 hover:bg-[#111111] transition-colors"
-            >
-              <td
-                className="px-4 py-3 whitespace-nowrap"
-                style={{ color: TEXT }}
+            <>
+              {/* ── Parent row ── */}
+              <tr
+                key={p.agent_name}
+                className="border-b border-[#2a2a2a] hover:bg-[#111111] transition-colors"
               >
-                <span className="font-medium">{label(p.agent_name)}</span>
-                {!p.is_system && (
-                  <span className="ml-2 rounded-full bg-purple-500/20 text-purple-400 text-xs px-1.5 py-0.5">
-                    custom
-                  </span>
-                )}
-              </td>
-              <td
-                className="px-4 py-3 font-mono text-xs max-w-0 w-full"
-                style={{ color: TEXT }}
-              >
-                <span className="block truncate">{truncate(p.content)}</span>
-              </td>
-              <td className="px-4 py-3 text-center">
-                <Switch
-                  checked={p.active}
-                  disabled={toggling === p.agent_name}
-                  onCheckedChange={() => handleToggle(p)}
-                />
-              </td>
-              <td className="px-4 py-3">
-                <div className="flex items-center justify-end gap-3">
-                  <button
-                    onClick={() => onEdit(p)}
-                    style={{ color: TEXT }}
-                    className="opacity-40 hover:opacity-100 transition-opacity"
-                    title="Edit prompt"
-                  >
-                    <PencilIcon />
-                  </button>
-                  {!p.is_system && (
-                    <DeleteCell
-                      agentName={p.agent_name}
-                      onDeleted={onDeleted}
-                    />
+                {/* Expand chevron — only visible when agent has children */}
+                <td className="w-6 pl-3 pr-0 py-3">
+                  {p.children.length > 0 && (
+                    <button
+                      onClick={() => toggleExpand(p.agent_name)}
+                      style={{ color: TEXT }}
+                      className="opacity-50 hover:opacity-100 transition-opacity"
+                      title={expanded.has(p.agent_name) ? "Collapse" : "Expand"}
+                    >
+                      <ChevronIcon open={expanded.has(p.agent_name)} />
+                    </button>
                   )}
-                </div>
-              </td>
-            </tr>
+                </td>
+                <td
+                  className="px-4 py-3 whitespace-nowrap"
+                  style={{ color: TEXT }}
+                >
+                  <span className="font-medium">{label(p.agent_name)}</span>
+                  {!p.is_system && (
+                    <span className="ml-2 rounded-full bg-purple-500/20 text-purple-400 text-xs px-1.5 py-0.5">
+                      custom
+                    </span>
+                  )}
+                  {p.children.length > 0 && (
+                    <span className="ml-2 rounded-full bg-blue-500/15 text-blue-400 text-xs px-1.5 py-0.5">
+                      {p.children.length} sub-agent
+                      {p.children.length !== 1 ? "s" : ""}
+                    </span>
+                  )}
+                </td>
+                <td
+                  className="px-4 py-3 font-mono text-xs max-w-0 w-full"
+                  style={{ color: TEXT }}
+                >
+                  <span className="block truncate">{truncate(p.content)}</span>
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center justify-center gap-2">
+                    {!p.is_system && (
+                      <button
+                        onClick={() => onAddChild(p.agent_name)}
+                        className="opacity-60 hover:opacity-100 transition-opacity pr-5"
+                        title="Add sub-agent"
+                      >
+                        <PlusIcon />
+                      </button>
+                    )}
+                    <Switch
+                      checked={p.active}
+                      disabled={toggling === p.agent_name}
+                      onCheckedChange={() => handleToggle(p)}
+                    />
+                  </div>
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center justify-end gap-3">
+                    <button
+                      onClick={() => onEdit(p)}
+                      style={{ color: TEXT, marginRight: 6 }}
+                      className="opacity-40 hover:opacity-100 transition-opacity"
+                      title="Edit prompt"
+                    >
+                      <PencilIcon />
+                    </button>
+                    {!p.is_system && (
+                      <DeleteCell
+                        agentName={p.agent_name}
+                        onDeleted={onDeleted}
+                      />
+                    )}
+                  </div>
+                </td>
+              </tr>
+
+              {/* ── Child rows (shown when expanded) ── */}
+              {expanded.has(p.agent_name) &&
+                p.children.map((child) => (
+                  <tr
+                    key={child.agent_name}
+                    className="border-b border-[#2a2a2a] last:border-0 transition-opacity duration-200"
+                    style={{
+                      backgroundColor: "#0d0d0d",
+                      opacity: p.active ? 1 : 0.35,
+                      pointerEvents: p.active ? "auto" : "none",
+                    }}
+                  >
+                    <td className="w-6" />
+                    <td
+                      className="py-2.5 whitespace-nowrap"
+                      style={{ color: TEXT }}
+                    >
+                      <div className="flex items-center gap-2 pl-6 border-l-2 border-[#2a2a2a] ml-4">
+                        <span className="text-xs opacity-40">↳</span>
+                        <span className="text-xs font-medium">
+                          {label(child.agent_name)}
+                        </span>
+                        <span className="text-xs opacity-40">
+                          {child.child_weight != null
+                            ? `weight ${child.child_weight}`
+                            : "equal weight"}
+                        </span>
+                      </div>
+                    </td>
+                    <td
+                      className="px-4 py-2.5 font-mono text-xs max-w-0 w-full"
+                      style={{ color: TEXT, opacity: 0.7 }}
+                    >
+                      <span className="block truncate">
+                        {truncate(child.content)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-center">
+                      <Switch
+                        checked={child.active}
+                        disabled={toggling === child.agent_name}
+                        onCheckedChange={() =>
+                          handleChildToggle(p.agent_name, child)
+                        }
+                      />
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center justify-end gap-3">
+                        <button
+                          onClick={() => onEdit(child)}
+                          style={{ color: TEXT }}
+                          className="opacity-40 hover:opacity-100 transition-opacity"
+                          title="Edit sub-agent prompt"
+                        >
+                          <PencilIcon />
+                        </button>
+                        <DeleteCell
+                          agentName={child.agent_name}
+                          onDeleted={onDeleted}
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+            </>
           ))}
         </tbody>
       </table>
@@ -495,7 +688,7 @@ function CeoAutonomousPanel() {
 
 // ── Create dialog ─────────────────────────────────────────────────────────────
 
-const PLACEHOLDER = `You are a custom analysis agent. For each stock in the input, analyze it and return YAML:
+const CHILD_PLACEHOLDER = `You are a sub-agent. For each stock in the input, analyze it and return YAML:
 
 - ticker: TICKER
   {agent_name}_score: 50
@@ -503,33 +696,63 @@ const PLACEHOLDER = `You are a custom analysis agent. For each stock in the inpu
 
 Return only valid YAML. No explanation.`;
 
+const PARENT_PLACEHOLDER = `Leave blank to use weighted average of children results (math mode).
+
+Fill in to act as a judge agent (judge mode): your prompt receives all children
+results as context and synthesizes them into a final verdict. Example:
+
+You are a synthesis agent. Sub-agent analyses are provided below.
+Weigh their findings and return a final YAML verdict for each stock.
+
+- ticker: TICKER
+  {agent_name}_score: 50
+  reasoning: "Synthesized judgment here."
+
+Return only valid YAML. No explanation.`;
+
 function CreateDialog({
   onClose,
   onCreated,
+  parentName,
 }: {
   onClose: () => void;
   onCreated: () => void;
+  parentName?: string;
 }) {
+  const isChild = Boolean(parentName);
   const [name, setName] = useState("");
   const [weight, setWeight] = useState("");
-  const [content, setContent] = useState(PLACEHOLDER);
+  const [content, setContent] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const nameValid = /^[a-z][a-z0-9_]*$/.test(name);
   const weightNum = parseFloat(weight) || 0;
-  const canSubmit = nameValid && weightNum > 0 && content.trim().length > 0;
+  const canSubmit =
+    nameValid &&
+    (isChild
+      ? content.trim().length > 0 && true // children always need a prompt
+      : weightNum > 0); // top-level: name + weight; prompt optional
 
   const submit = async () => {
     setError(null);
     setSaving(true);
     try {
-      const payload: CreatePromptPayload = {
-        agent_name: name,
-        weight: weightNum,
-        content: content.trim(),
-      };
-      await api.createPrompt(payload);
+      if (isChild) {
+        const payload: CreateChildPromptPayload = {
+          agent_name: name,
+          child_weight: weightNum > 0 ? weightNum : null,
+          content: content.trim(),
+        };
+        await api.createChildPrompt(parentName!, payload);
+      } else {
+        const payload: CreatePromptPayload = {
+          agent_name: name,
+          weight: weightNum,
+          content: content.trim(),
+        };
+        await api.createPrompt(payload);
+      }
       onCreated();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -538,12 +761,16 @@ function CreateDialog({
     }
   };
 
+  const dialogTitle = isChild
+    ? `New Sub-Agent for "${parentName}"`
+    : "New Agent";
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
       <div className="w-full max-w-2xl rounded-xl border border-[#2a2a2a] bg-[#111111] shadow-2xl flex flex-col max-h-[90vh]">
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#2a2a2a]">
           <h2 className="text-base font-semibold" style={{ color: TEXT }}>
-            New Agent
+            {dialogTitle}
           </h2>
           <button
             onClick={onClose}
@@ -595,21 +822,23 @@ function CreateDialog({
                 className="text-xs uppercase tracking-wider"
                 style={{ color: TEXT, opacity: 0.6 }}
               >
-                Weight (0–1) *
+                {isChild ? "Weight (optional)" : "Weight (0–1) *"}
               </label>
               <input
                 type="number"
                 value={weight}
                 onChange={(e) => setWeight(e.target.value)}
-                placeholder="0.10"
+                placeholder={isChild ? "blank = equal share" : "0.10"}
                 min="0.01"
-                max="1"
+                max="100"
                 step="0.01"
                 className="w-full rounded-md border border-[#2a2a2a] bg-[#0a0a0a] px-3 py-2 text-sm font-mono outline-none focus:border-blue-500 transition-colors"
                 style={{ color: TEXT }}
               />
               <p className="text-xs opacity-50" style={{ color: TEXT }}>
-                CEO scoring contribution
+                {isChild
+                  ? "Relative weight within this parent (null = equal)"
+                  : "CEO scoring contribution"}
               </p>
             </div>
           </div>
@@ -619,14 +848,15 @@ function CreateDialog({
               className="text-xs uppercase tracking-wider"
               style={{ color: TEXT, opacity: 0.6 }}
             >
-              Prompt content *
+              {isChild ? "Prompt content *" : "Prompt content"}
             </label>
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
+              placeholder={isChild ? CHILD_PLACEHOLDER : PARENT_PLACEHOLDER}
               rows={12}
               spellCheck={false}
-              className="w-full rounded-md border border-[#2a2a2a] bg-[#0a0a0a] px-3 py-2 text-xs font-mono outline-none focus:border-blue-500 resize-y transition-colors"
+              className="w-full rounded-md border border-[#2a2a2a] bg-[#0a0a0a] px-3 py-2 text-xs font-mono outline-none focus:border-blue-500 resize-y transition-colors placeholder:opacity-30"
               style={{ color: TEXT }}
             />
           </div>
@@ -647,7 +877,11 @@ function CreateDialog({
             disabled={!canSubmit || saving}
             className="px-4 py-2 text-sm rounded-md bg-blue-600 hover:bg-blue-500 text-white transition-colors disabled:opacity-50"
           >
-            {saving ? "Creating…" : "Create Agent"}
+            {saving
+              ? "Creating…"
+              : isChild
+                ? "Create Sub-Agent"
+                : "Create Agent"}
           </button>
         </div>
       </div>
@@ -692,8 +926,12 @@ export default function PromptsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [innerTab, setInnerTab] = useState("System");
-  const [editing, setEditing] = useState<PromptInfo | null>(null);
+  const [editing, setEditing] = useState<{
+    agent_name: string;
+    content: string;
+  } | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [showCreateChild, setShowCreateChild] = useState<string | null>(null); // parent agent_name
 
   const refresh = useCallback(async () => {
     try {
@@ -711,10 +949,30 @@ export default function PromptsPage() {
     refresh();
   }, [refresh]);
 
-  // Optimistic toggle — update local state without a full refresh
+  // Optimistic toggle for top-level agents
   const handleToggle = (name: string, active: boolean) => {
     setPrompts((prev) =>
       prev.map((p) => (p.agent_name === name ? { ...p, active } : p)),
+    );
+  };
+
+  // Optimistic toggle for child agents
+  const handleChildToggle = (
+    parentName: string,
+    childName: string,
+    active: boolean,
+  ) => {
+    setPrompts((prev) =>
+      prev.map((p) =>
+        p.agent_name === parentName
+          ? {
+              ...p,
+              children: p.children.map((c) =>
+                c.agent_name === childName ? { ...c, active } : c,
+              ),
+            }
+          : p,
+      ),
     );
   };
 
@@ -777,6 +1035,8 @@ export default function PromptsPage() {
                 onEdit={setEditing}
                 onDeleted={refresh}
                 onToggle={handleToggle}
+                onChildToggle={handleChildToggle}
+                onAddChild={(parentName) => setShowCreateChild(parentName)}
               />
             )}
           </div>
@@ -796,6 +1056,17 @@ export default function PromptsPage() {
           onClose={() => setShowCreate(false)}
           onCreated={() => {
             setShowCreate(false);
+            refresh();
+          }}
+        />
+      )}
+
+      {showCreateChild && (
+        <CreateDialog
+          parentName={showCreateChild}
+          onClose={() => setShowCreateChild(null)}
+          onCreated={() => {
+            setShowCreateChild(null);
             refresh();
           }}
         />

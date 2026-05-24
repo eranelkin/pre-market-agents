@@ -36,6 +36,8 @@ class AgentConfig(BaseModel):
     timeout_seconds: int = 45
     enable_web_search: bool = False
     enable_deep_search: bool = False
+    parent: Optional[str] = None        # if set, this agent is a child of the named parent
+    child_weight: Optional[float] = None  # relative weight within parent group; None = treated as 1.0
 
 
 class PipelineConfig(BaseModel):
@@ -94,6 +96,22 @@ class AgentsConfig(BaseModel):
                     f"pipeline.active_variants entry '{vid}' not in model_variants"
                 )
 
+        # Validate parent-child relationships
+        agent_names = set(self.agents.keys())
+        for name, cfg in self.agents.items():
+            if cfg.parent is None:
+                continue
+            if cfg.parent not in agent_names:
+                raise ValueError(f"agent '{name}' references unknown parent '{cfg.parent}'")
+            parent_cfg = self.agents[cfg.parent]
+            if parent_cfg.is_system:
+                raise ValueError(f"agent '{name}' cannot be a child of system agent '{cfg.parent}'")
+            if parent_cfg.parent is not None:
+                raise ValueError(
+                    f"agent '{name}' cannot be a child of '{cfg.parent}' which is itself a child "
+                    "(only one level of nesting is supported)"
+                )
+
         return self
 
     # ── Convenience accessors ──────────────────────────────────────────────────
@@ -131,6 +149,10 @@ class AgentsConfig(BaseModel):
     def provider_for_variant(self, variant_id: str) -> ProviderConfig:
         variant = self.get_variant(variant_id)
         return self.providers[variant.provider]
+
+    def get_children(self, parent_name: str) -> list[tuple[str, "AgentConfig"]]:
+        """Return (name, config) pairs for all agents whose parent is parent_name."""
+        return [(n, c) for n, c in self.agents.items() if c.parent == parent_name]
 
     def is_multi_variant(self) -> bool:
         return len(self.pipeline.active_variants) > 1

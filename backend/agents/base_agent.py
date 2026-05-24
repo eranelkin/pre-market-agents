@@ -123,6 +123,37 @@ class BaseAgent:
             )
             return AgentBatchResult.empty(self.agent_name, batch_id, run_id)
 
+    async def run_with_children_context(
+        self,
+        stocks: list[StockInput],
+        run_id: UUID,
+        batch_id: UUID,
+        children_context: str,
+    ) -> AgentBatchResult:
+        """Run this agent as a judge: same as run() but injects children results into the user message."""
+        agent_cfg = get_agents_config().get_agent(self.agent_name)
+        try:
+            return await asyncio.wait_for(
+                self._run_inner(stocks, run_id, batch_id, agent_cfg, children_context),
+                timeout=float(agent_cfg.timeout_seconds),
+            )
+        except asyncio.TimeoutError:
+            log.error(
+                "agent_timeout",
+                agent=self.agent_name,
+                timeout_s=agent_cfg.timeout_seconds,
+                batch_id=str(batch_id),
+            )
+            return AgentBatchResult.empty(self.agent_name, batch_id, run_id)
+        except Exception as exc:
+            log.error(
+                "agent_failed",
+                agent=self.agent_name,
+                error=str(exc),
+                batch_id=str(batch_id),
+            )
+            return AgentBatchResult.empty(self.agent_name, batch_id, run_id)
+
     # ── Internal pipeline ──────────────────────────────────────────────────────
 
     async def _run_inner(
@@ -131,10 +162,11 @@ class BaseAgent:
         run_id: UUID,
         batch_id: UUID,
         agent_cfg: AgentConfig,
+        children_context: str | None = None,
     ) -> AgentBatchResult:
         tools = self._build_tools(agent_cfg)
         system_prompt = get_prompt_manager().get(self.agent_name)
-        messages = self._build_messages(system_prompt, stocks)
+        messages = self._build_messages(system_prompt, stocks, children_context)
 
         client, primary, fallback = build_llm_client_for_agent(
             self.agent_name, self._override_variant_id
@@ -198,7 +230,10 @@ class BaseAgent:
     # ── Message building ───────────────────────────────────────────────────────
 
     def _build_messages(
-        self, system_prompt: str, stocks: list[StockInput]
+        self,
+        system_prompt: str,
+        stocks: list[StockInput],
+        children_context: str | None = None,
     ) -> list[dict]:
         stock_data = json.dumps(
             [s.model_dump() for s in stocks], indent=2, default=str
@@ -207,6 +242,8 @@ class BaseAgent:
             f"Analyze the following {len(stocks)} stock(s) "
             f"and return the required YAML output:\n\n```json\n{stock_data}\n```"
         )
+        if children_context:
+            user_content += f"\n\n{children_context}"
         return [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_content},

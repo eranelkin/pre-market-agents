@@ -37,8 +37,15 @@ class PromptCreateRequest(BaseModel):
     default_variant: str | None = None
 
 
-def _read_prompt(name: str, agent: AgentConfig) -> dict:
-    path = _PROJECT_ROOT / agent.prompt_file
+class ChildPromptCreateRequest(BaseModel):
+    agent_name: str = Field(..., pattern=r"^[a-z][a-z0-9_]*$")
+    child_weight: float | None = Field(None, gt=0)
+    content: str
+
+
+def _read_prompt_file(prompt_file: str) -> tuple[str, str | None]:
+    """Read file content and ISO last_modified. Returns (content, last_modified)."""
+    path = _PROJECT_ROOT / prompt_file
     try:
         content = path.read_text(encoding="utf-8")
         last_modified = datetime.fromtimestamp(
@@ -47,6 +54,11 @@ def _read_prompt(name: str, agent: AgentConfig) -> dict:
     except FileNotFoundError:
         content = ""
         last_modified = None
+    return content, last_modified
+
+
+def _read_prompt(name: str, agent: AgentConfig) -> dict:
+    content, last_modified = _read_prompt_file(agent.prompt_file)
     return {
         "agent_name": name,
         "file_path": agent.prompt_file,
@@ -56,14 +68,37 @@ def _read_prompt(name: str, agent: AgentConfig) -> dict:
         "is_system": agent.is_system,
         "active": agent.active,
         "weight": agent.weight,
+        "children": [],  # populated by list_prompts for top-level agents
+    }
+
+
+def _read_child_prompt(name: str, agent: AgentConfig) -> dict:
+    content, last_modified = _read_prompt_file(agent.prompt_file)
+    return {
+        "agent_name": name,
+        "file_path": agent.prompt_file,
+        "content": content,
+        "last_modified": last_modified,
+        "char_count": len(content),
+        "active": agent.active,
+        "child_weight": agent.child_weight,
     }
 
 
 @router.get("/prompts")
 async def list_prompts():
-    """Return all agent prompts with their current file content."""
+    """Return top-level agent prompts with children embedded. Child agents are not in the top list."""
     cfg = get_agents_config()
-    return [_read_prompt(name, agent) for name, agent in cfg.agents.items()]
+    result = []
+    for name, agent in cfg.agents.items():
+        if agent.parent is not None:
+            continue  # children are nested under their parent, not in the top-level list
+        info = _read_prompt(name, agent)
+        info["children"] = [
+            _read_child_prompt(cn, cc) for cn, cc in cfg.get_children(name)
+        ]
+        result.append(info)
+    return result
 
 
 @router.post("/prompts", status_code=201)
@@ -102,6 +137,48 @@ async def create_prompt(body: PromptCreateRequest):
 
     reload_prompts()
     return {"status": "created", "agent_name": body.agent_name, "prompt_file": prompt_file}
+
+
+@router.post("/prompts/{parent_name}/children", status_code=201)
+async def create_child_prompt(parent_name: str, body: ChildPromptCreateRequest):
+    """Create a child sub-agent under an existing custom agent."""
+    cfg = get_agents_config()
+
+    if parent_name not in cfg.agents:
+        raise HTTPException(404, f"Agent '{parent_name}' not found")
+    parent = cfg.agents[parent_name]
+    if parent.is_system:
+        raise HTTPException(400, f"Cannot add children to system agent '{parent_name}'")
+    if parent.parent is not None:
+        raise HTTPException(400, f"Agent '{parent_name}' is itself a child — only one level of nesting is supported")
+    if body.agent_name in cfg.agents:
+        raise HTTPException(409, f"Agent '{body.agent_name}' already exists")
+
+    prompt_file = f"prompts/{body.agent_name}_prompt.md"
+    path = _PROJECT_ROOT / prompt_file
+    try:
+        path.write_text(body.content, encoding="utf-8")
+    except Exception as exc:
+        raise HTTPException(500, f"Failed to write prompt file: {exc}")
+
+    try:
+        add_agent(
+            body.agent_name,
+            AgentConfig(
+                weight=0.0,
+                child_weight=body.child_weight,
+                parent=parent_name,
+                prompt_file=prompt_file,
+                default_variant=parent.default_variant,
+                fallback_variant=parent.fallback_variant,
+            ),
+        )
+    except Exception as exc:
+        path.unlink(missing_ok=True)
+        raise HTTPException(500, f"Failed to update config: {exc}")
+
+    reload_prompts()
+    return {"status": "created", "agent_name": body.agent_name, "parent": parent_name, "prompt_file": prompt_file}
 
 
 # ── Routes with {agent_name} parameter ───────────────────────────────────────
@@ -151,18 +228,24 @@ async def update_prompt(agent_name: str, body: PromptUpdateRequest):
 
 @router.delete("/prompts/{agent_name}")
 async def delete_prompt(agent_name: str):
-    """Delete a custom agent: remove from config and delete its .md file."""
+    """Delete a custom agent and cascade-delete its children if it has any."""
     cfg = get_agents_config()
     if agent_name not in cfg.agents:
         raise HTTPException(404, f"Agent '{agent_name}' not found")
     if cfg.agents[agent_name].is_system:
         raise HTTPException(400, f"Cannot delete system agent '{agent_name}'")
 
+    # Cascade: remove children first (children have no children, so no recursion needed)
+    children = cfg.get_children(agent_name)
+    deleted_children = []
+    for child_name, child_cfg in children:
+        remove_agent(child_name)
+        (_PROJECT_ROOT / child_cfg.prompt_file).unlink(missing_ok=True)
+        deleted_children.append(child_name)
+
     prompt_file = cfg.agents[agent_name].prompt_file
     remove_agent(agent_name)
-
-    path = _PROJECT_ROOT / prompt_file
-    path.unlink(missing_ok=True)
+    (_PROJECT_ROOT / prompt_file).unlink(missing_ok=True)
 
     reload_prompts()
-    return {"status": "deleted", "agent_name": agent_name}
+    return {"status": "deleted", "agent_name": agent_name, "children_deleted": deleted_children}

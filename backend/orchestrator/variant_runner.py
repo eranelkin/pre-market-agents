@@ -45,6 +45,7 @@ class VariantRunner:
         session_id: UUID,
         process_id: str,
         variant_run_ids: dict[str, UUID],  # {variant_id: run_id}
+        chunk_size: int | None = None,
     ) -> VariantRunnerResult:
         """
         variant_run_ids maps each active variant to its pre-created run_id.
@@ -61,7 +62,7 @@ class VariantRunner:
         # ── Run all variants concurrently ──────────────────────────────────────
         tasks = {
             variant_id: asyncio.create_task(
-                self._run_variant(stocks, run_id, variant_id),
+                self._run_variant(stocks, run_id, variant_id, chunk_size),
                 name=f"variant_{variant_id}",
             )
             for variant_id, run_id in variant_run_ids.items()
@@ -114,12 +115,14 @@ class VariantRunner:
         stocks: list[StockInput],
         run_id: UUID,
         variant_id: str,
+        chunk_size: int | None = None,
     ) -> VariantRunResult:
         orchestrator = Orchestrator()
         pipeline_result = await orchestrator.run(
             stocks=stocks,
             run_id=run_id,
             override_variant_id=variant_id,
+            chunk_size=chunk_size,
         )
         return VariantRunResult(
             variant_id=variant_id,

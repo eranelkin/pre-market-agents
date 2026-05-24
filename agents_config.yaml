@@ -62,6 +62,8 @@ agents:
     timeout_seconds: 60
     enable_web_search: false
     enable_deep_search: false
+    parent: null
+    child_weight: null
   technical:
     is_system: false
     weight: 0.3
@@ -73,6 +75,8 @@ agents:
     timeout_seconds: 60
     enable_web_search: false
     enable_deep_search: false
+    parent: null
+    child_weight: null
   fundamental:
     is_system: false
     weight: 0.25
@@ -84,6 +88,8 @@ agents:
     timeout_seconds: 60
     enable_web_search: false
     enable_deep_search: false
+    parent: null
+    child_weight: null
   sentiment:
     is_system: false
     weight: 0.2
@@ -95,6 +101,8 @@ agents:
     timeout_seconds: 60
     enable_web_search: true
     enable_deep_search: false
+    parent: null
+    child_weight: null
   risk:
     is_system: false
     weight: 0.15
@@ -106,6 +114,8 @@ agents:
     timeout_seconds: 60
     enable_web_search: false
     enable_deep_search: false
+    parent: null
+    child_weight: null
   macro:
     is_system: false
     weight: 0.1
@@ -117,6 +127,8 @@ agents:
     timeout_seconds: 60
     enable_web_search: true
     enable_deep_search: false
+    parent: null
+    child_weight: null
   ceo:
     is_system: true
     weight: 0.0
@@ -128,6 +140,8 @@ agents:
     timeout_seconds: 180
     enable_web_search: false
     enable_deep_search: false
+    parent: null
+    child_weight: null
 pipeline:
   ceo_autonomous: false
   chunk_size: 5

@@ -3,8 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { BarChart2, ClipboardList, GitCompare, Trash2, X } from "lucide-react";
 import { api, RunSummary, StartRunResponse } from "@/lib/api";
-import { RunTrigger } from "@/components/RunTrigger";
-import { ModelVariantSelector } from "@/components/ModelVariantSelector";
+import { RunAnalysisDialog } from "@/components/RunAnalysisDialog";
 import { StatusBadge } from "@/components/StatusBadge";
 import {
   Table,
@@ -103,6 +102,7 @@ function fmtDate(iso: string) {
 export default function Home() {
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [elapsedMap, setElapsedMap] = useState<Record<string, number>>({});
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const fetchRuns = useCallback(async () => {
     try {
@@ -201,7 +201,7 @@ export default function Home() {
         className="max-w-6xl mx-auto p-6 space-y-6"
         style={{ maxWidth: "80%" }}
       >
-        <header className="flex items-start justify-between gap-6">
+        <header className="flex items-center justify-between gap-6">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
               Pre-Market Advisor
@@ -210,14 +210,19 @@ export default function Home() {
               Daily AI-powered stock ranking pipeline
             </p>
           </div>
-          <RunTrigger onStarted={onStarted} compact />
+          <button
+            onClick={() => setDialogOpen(true)}
+            className="rounded-full bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 active:bg-blue-700 transition-colors"
+          >
+            Run Analysis
+          </button>
         </header>
 
-        <div className="flex justify-end">
-          <div className="w-full md:w-1/3">
-            <ModelVariantSelector />
-          </div>
-        </div>
+        <RunAnalysisDialog
+          open={dialogOpen}
+          onClose={() => setDialogOpen(false)}
+          onStarted={(resp) => { onStarted(resp); setDialogOpen(false); }}
+        />
 
         <Card>
           <CardHeader>

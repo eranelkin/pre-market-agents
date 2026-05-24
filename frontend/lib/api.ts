@@ -162,6 +162,16 @@ export interface TestConnectionResult {
   message: string | null;
 }
 
+export interface ChildPromptInfo {
+  agent_name: string;
+  file_path: string;
+  content: string;
+  last_modified: string | null;
+  char_count: number;
+  active: boolean;
+  child_weight: number | null;
+}
+
 export interface PromptInfo {
   agent_name: string;
   file_path: string;
@@ -171,6 +181,7 @@ export interface PromptInfo {
   is_system: boolean;
   active: boolean;
   weight: number;
+  children: ChildPromptInfo[];
 }
 
 export interface CreatePromptPayload {
@@ -178,6 +189,12 @@ export interface CreatePromptPayload {
   weight: number;
   content: string;
   default_variant?: string;
+}
+
+export interface CreateChildPromptPayload {
+  agent_name: string;
+  child_weight?: number | null;
+  content: string;
 }
 
 export interface ModelsResponse {
@@ -226,9 +243,10 @@ export const api = {
   getComparison: (sessionId: string) =>
     apiFetch<ComparisonOutput>(`/api/v1/compare/${sessionId}`),
 
-  startRun: (file: File) => {
+  startRun: (file: File, chunkSize: number = 5) => {
     const form = new FormData();
     form.append("file", file);
+    form.append("chunk_size", String(chunkSize));
     return apiFetch<StartRunResponse>("/api/v1/run", { method: "POST", body: form });
   },
 
@@ -293,6 +311,12 @@ export const api = {
     apiFetch<{ status: string; agent_name: string }>(
       `/api/v1/prompts/${agentName}`,
       { method: "DELETE" }
+    ),
+
+  createChildPrompt: (parentName: string, payload: CreateChildPromptPayload) =>
+    apiFetch<{ status: string; agent_name: string; parent: string; prompt_file: string }>(
+      `/api/v1/prompts/${parentName}/children`,
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }
     ),
 
   reloadPrompts: () =>

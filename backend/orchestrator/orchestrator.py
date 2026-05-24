@@ -120,9 +120,10 @@ class Orchestrator:
         stocks: list[StockInput],
         run_id: UUID,
         override_variant_id: str,
+        chunk_size: int | None = None,
     ) -> PipelineResult:
         cfg = get_agents_config()
-        chunk_size = cfg.pipeline.chunk_size
+        chunk_size = chunk_size if chunk_size is not None else cfg.pipeline.chunk_size
         chunks = chunker.split(stocks, chunk_size)
         total_chunks = len(chunks)
 
@@ -197,28 +198,48 @@ class Orchestrator:
         override_variant_id: str,
     ) -> ChunkResult:
         """
-        Level 2: run all configured agents (excluding CEO) over this chunk concurrently.
-        Agent failures are already isolated inside BaseAgent.run().
+        Level 2: run all top-level analysis agents concurrently.
+        Agents that have active children delegate to ChildAggregator instead of calling
+        the LLM directly.  Agent failures are isolated inside BaseAgent.run().
         """
-        cfg = get_agents_config()
-        agents = [
-            _make_agent(name, override_variant_id)
-            for name, agent_cfg in cfg.agents.items()
-            if not agent_cfg.is_system and agent_cfg.active
-        ]
+        from backend.orchestrator.child_aggregator import ChildAggregator
 
-        # Publish which agents are starting so the frontend can show meaningful progress.
+        cfg = get_agents_config()
+
+        coroutines = []
+        task_names: list[str] = []
+
+        for name, agent_cfg in cfg.agents.items():
+            # Skip system agents, inactive agents, and child agents (they run via parent)
+            if agent_cfg.is_system or not agent_cfg.active or agent_cfg.parent is not None:
+                continue
+
+            active_children = [
+                (cn, cc)
+                for cn, cc in cfg.agents.items()
+                if cc.parent == name and cc.active
+            ]
+
+            if active_children:
+                child_agents = [_make_agent(cn, override_variant_id) for cn, cc in active_children]
+                child_cfgs = [cc for _, cc in active_children]
+                aggregator = ChildAggregator(parent_name=name, override_variant_id=override_variant_id)
+                coroutines.append(aggregator.run(child_agents, child_cfgs, chunk, run_id, batch_id))
+            else:
+                agent = _make_agent(name, override_variant_id)
+                coroutines.append(agent.run(chunk, run_id, batch_id))
+
+            task_names.append(name)
+
+        # Publish which top-level agents are starting so the frontend can show progress.
         await publish_run_event(str(run_id), {
             "type": "progress",
             "stage": "agents_running",
-            "agent_names": [a.agent_name for a in agents],
+            "agent_names": task_names,
             "tickers": [s.ticker for s in chunk],
         })
 
-        raw_results = await asyncio.gather(
-            *[agent.run(chunk, run_id, batch_id) for agent in agents],
-            return_exceptions=True,
-        )
+        raw_results = await asyncio.gather(*coroutines, return_exceptions=True)
 
         agent_results = {}
         for r in raw_results:
@@ -226,9 +247,10 @@ class Orchestrator:
                 log.error("agent_gather_exception", batch_id=str(batch_id), error=str(r))
             else:
                 agent_results[r.agent_name] = r
+
         failed_agents = [
             name for name, r in agent_results.items() if not r.parsed_output
-        ] + [a.agent_name for a in agents if a.agent_name not in agent_results]
+        ] + [name for name in task_names if name not in agent_results]
 
         if failed_agents:
             log.warning(

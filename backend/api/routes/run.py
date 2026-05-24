@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import orjson
 import structlog
 import yaml
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -44,6 +44,7 @@ router = APIRouter(prefix="/api/v1", tags=["run"])
 async def start_run(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
+    chunk_size: int = Form(5),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -104,6 +105,7 @@ async def start_run(
         session_id=session_id,
         process_id=process_id,
         variant_run_ids=variant_run_ids,
+        chunk_size=chunk_size,
     )
 
     log.info(
@@ -340,6 +342,7 @@ async def _pipeline_task(
     session_id: uuid.UUID,
     process_id: str,
     variant_run_ids: dict[str, uuid.UUID],
+    chunk_size: int = 5,
 ):
     # Immediately mark all runs as "running" so SSE DB-polling sees a live status.
     async with AsyncSessionLocal() as db:
@@ -359,6 +362,7 @@ async def _pipeline_task(
                 session_id=session_id,
                 process_id=process_id,
                 variant_run_ids=variant_run_ids,
+                chunk_size=chunk_size,
             ),
             timeout=900.0,  # 15-minute hard ceiling — catches any provider hang that escapes agent-level timeouts
         )
