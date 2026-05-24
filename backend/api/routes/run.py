@@ -497,6 +497,7 @@ async def _persist_variant(
                         run_id=vr.run_id,
                         session_id=session_id,
                         agent_name=agent_name,
+                        parent_agent_name=None,
                         ticker=ticker,
                         provider_used=br.provider_used,
                         model_used=br.model_used,
@@ -509,6 +510,30 @@ async def _persist_variant(
                         latency_ms=br.latency_ms,
                     )
                 )
+            for child_br in br.child_results:
+                child_parsed = child_br.parsed_output or {}
+                # Use child's own tickers when parsing succeeded; fall back to batch tickers
+                save_tickers = list(child_parsed.keys()) if child_parsed else tickers
+                for ticker in save_tickers:
+                    db.add(
+                        AgentResultORM(
+                            batch_id=chunk.batch_id,
+                            run_id=vr.run_id,
+                            session_id=session_id,
+                            agent_name=child_br.agent_name,
+                            parent_agent_name=agent_name,
+                            ticker=ticker,
+                            provider_used=child_br.provider_used,
+                            model_used=child_br.model_used,
+                            was_fallback=child_br.was_fallback,
+                            web_search_used=child_br.web_search_used,
+                            raw_prompt=child_br.raw_prompt[:8000] if child_br.raw_prompt else None,
+                            raw_response=child_br.raw_response[:8000] if child_br.raw_response else None,
+                            parsed_output=child_parsed.get(ticker),
+                            tokens_used=child_br.tokens_used,
+                            latency_ms=child_br.latency_ms,
+                        )
+                    )
 
     # FinalResults
     for item in pipeline.ceo_output.stocks:

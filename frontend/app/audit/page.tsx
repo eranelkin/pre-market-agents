@@ -75,12 +75,35 @@ function cellStatus(entry: AuditEntry): "ok" | "fallback" | "error" {
 }
 
 /** Build a sorted list of all agent names found in entries.
- *  Known agents come first (in KNOWN_ORDER), then custom/child agents alpha. */
+ *  Known agents come first (in KNOWN_ORDER), children follow their parent immediately,
+ *  then custom top-level agents alphabetically with their children after each. */
 function activeAgentsFrom(entries: AuditEntry[]): string[] {
-  const all = Array.from(new Set(entries.map((e) => e.agent_name)));
-  const known = KNOWN_ORDER.filter((a) => all.includes(a));
-  const extra = all.filter((a) => !KNOWN_ORDER.includes(a)).sort();
-  return [...known, ...extra];
+  const parentOf = new Map<string, string>();
+  entries.forEach((e) => {
+    if (e.parent_agent_name) parentOf.set(e.agent_name, e.parent_agent_name);
+  });
+  const all = new Set(entries.map((e) => e.agent_name));
+
+  const ordered: string[] = [];
+  for (const known of KNOWN_ORDER) {
+    if (all.has(known)) {
+      ordered.push(known);
+      const children = [...all].filter((a) => parentOf.get(a) === known).sort();
+      children.forEach((c) => { ordered.push(c); all.delete(c); });
+      all.delete(known);
+    }
+  }
+  // Remaining custom top-level agents (not children) + their children
+  const topLevel = [...all].filter((a) => !parentOf.has(a)).sort();
+  for (const tl of topLevel) {
+    ordered.push(tl);
+    [...all].filter((a) => parentOf.get(a) === tl).sort().forEach((c) => {
+      ordered.push(c);
+      all.delete(c);
+    });
+    all.delete(tl);
+  }
+  return ordered;
 }
 
 type MatrixData = {
@@ -301,6 +324,11 @@ function RunDrawer({
   // All agents found in this run, known ones first, then custom/child agents
   const activeAgents = activeAgentsFrom(entries);
   const { tickers, matrix } = buildMatrix(entries, activeAgents);
+  const parentOf = new Map(
+    entries.flatMap((e) =>
+      e.parent_agent_name ? [[e.agent_name, e.parent_agent_name]] : []
+    )
+  );
 
   return (
     <div
@@ -419,7 +447,14 @@ function RunDrawer({
                 </th>
                 {activeAgents.map((a) => (
                   <th key={a} className="py-2 px-1 text-center">
-                    <AgentBadge name={a} />
+                    {parentOf.has(a) ? (
+                      <span className="flex items-center justify-center gap-1">
+                        <span className="text-muted-foreground text-xs opacity-50">↳</span>
+                        <AgentBadge name={a} />
+                      </span>
+                    ) : (
+                      <AgentBadge name={a} />
+                    )}
                   </th>
                 ))}
               </tr>

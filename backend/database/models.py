@@ -129,6 +129,7 @@ class AgentResult(Base):
         nullable=False,
     )
     agent_name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
+    parent_agent_name: Mapped[str | None] = mapped_column(sa.String(50), nullable=True)
     ticker: Mapped[str] = mapped_column(sa.String(20), nullable=False)
     provider_used: Mapped[str | None] = mapped_column(sa.String(50), nullable=True)
     model_used: Mapped[str | None] = mapped_column(sa.String(100), nullable=True)

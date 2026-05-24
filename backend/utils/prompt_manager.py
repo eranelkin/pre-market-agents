@@ -48,6 +48,15 @@ class PromptManager:
     def get(self, agent_name: str) -> str:
         with self._lock:
             if agent_name not in self._prompts:
+                # Lazy-load from the current config (respects test/prod ContextVar during runs)
+                from backend.agents_config_loader import get_agents_config
+                try:
+                    cfg = get_agents_config()
+                    if agent_name in cfg.agents:
+                        if self._load_one(agent_name, cfg.agents[agent_name].prompt_file):
+                            return self._prompts[agent_name]
+                except Exception:
+                    pass
                 raise KeyError(
                     f"No prompt loaded for agent '{agent_name}'. "
                     "Ensure PromptManager.load() was called at startup "

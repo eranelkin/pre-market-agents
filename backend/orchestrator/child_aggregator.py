@@ -115,10 +115,12 @@ class ChildAggregator:
 
         if parent_prompt.strip():
             log.debug("child_aggregator_judge_mode", parent=self.parent_name)
-            return await self._run_judge(successful, child_agents, stocks, run_id, batch_id)
+            result = await self._run_judge(successful, child_agents, stocks, run_id, batch_id)
         else:
             log.debug("child_aggregator_math_mode", parent=self.parent_name)
-            return self._aggregate(successful, batch_id, run_id)
+            result = self._aggregate(successful, batch_id, run_id)
+        result.child_results = [r for r, _ in successful]
+        return result
 
     # ── Judge mode ─────────────────────────────────────────────────────────────
 

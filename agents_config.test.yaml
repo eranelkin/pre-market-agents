@@ -155,6 +155,19 @@ agents:
     enable_deep_search: false
     parent: technical
     child_weight: null
+  second:
+    is_system: false
+    weight: 0.0
+    active: true
+    prompt_file: prompts/test/second_prompt.md
+    default_variant: llama_3_3_70b
+    fallback_variant: gemini_flash
+    max_tokens: 2000
+    timeout_seconds: 45
+    enable_web_search: false
+    enable_deep_search: false
+    parent: technical
+    child_weight: null
 pipeline:
   ceo_autonomous: false
   chunk_size: 2

@@ -1,1 +1,1 @@
-hello test
+what is the date today?

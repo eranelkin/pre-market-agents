@@ -18,6 +18,7 @@ class AuditEntry(BaseModel):
     session_id: str
     model_variant_id: str
     agent_name: str
+    parent_agent_name: str | None
     ticker: str
     provider_used: str | None
     model_used: str | None
@@ -96,6 +97,7 @@ async def get_audit_log(
             session_id=str(ar.session_id),
             model_variant_id=model_variant_id,
             agent_name=ar.agent_name,
+            parent_agent_name=ar.parent_agent_name,
             ticker=ar.ticker,
             provider_used=ar.provider_used,
             model_used=ar.model_used,

@@ -215,6 +215,7 @@ export interface AuditEntry {
   session_id: string;
   model_variant_id: string;
   agent_name: string;
+  parent_agent_name: string | null;
   ticker: string;
   provider_used: string | null;
   model_used: string | null;

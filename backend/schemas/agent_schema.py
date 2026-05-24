@@ -159,6 +159,7 @@ class AgentBatchResult(BaseModel):
     parsed_output: dict[str, Any]
     tokens_used: int
     latency_ms: int
+    child_results: list["AgentBatchResult"] = Field(default_factory=list)
 
     @classmethod
     def empty(cls, agent_name: str, batch_id: UUID, run_id: UUID) -> "AgentBatchResult":
