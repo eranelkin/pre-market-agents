@@ -15,9 +15,10 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onStarted: (resp: StartRunResponse) => void;
+  testMode: boolean;
 }
 
-export function RunAnalysisDialog({ open, onClose, onStarted }: Props) {
+export function RunAnalysisDialog({ open, onClose, onStarted, testMode }: Props) {
   const [file, setFile] = useState<File | null>(null);
   const [chunkSize, setChunkSize] = useState(5);
   const [dragging, setDragging] = useState(false);
@@ -47,7 +48,7 @@ export function RunAnalysisDialog({ open, onClose, onStarted }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const resp = await api.startRun(file, chunkSize);
+      const resp = await api.startRun(file, chunkSize, testMode);
       onStarted(resp);
       setFile(null);
       setChunkSize(5);
@@ -67,6 +68,12 @@ export function RunAnalysisDialog({ open, onClose, onStarted }: Props) {
         </DialogHeader>
 
         <div className="space-y-5 py-2">
+          {testMode && (
+            <div className="flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-400">
+              <span className="font-semibold">Test mode</span>
+              <span className="text-amber-400/70">— uses stub prompts &amp; agents_config.test.yaml. Fast, free, no real analysis.</span>
+            </div>
+          )}
           {/* File picker */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Stock file</label>

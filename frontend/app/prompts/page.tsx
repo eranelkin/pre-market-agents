@@ -8,6 +8,7 @@ import {
   PromptInfo,
 } from "@/lib/api";
 import { Switch } from "@/components/ui/switch";
+import { useTestMode } from "@/lib/test-mode-context";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -38,10 +39,12 @@ function EditModal({
   prompt,
   onClose,
   onSaved,
+  testMode,
 }: {
   prompt: { agent_name: string; content: string };
   onClose: () => void;
   onSaved: () => void;
+  testMode: boolean;
 }) {
   const [draft, setDraft] = useState(prompt.content);
   const [saving, setSaving] = useState(false);
@@ -61,7 +64,7 @@ function EditModal({
     setSaving(true);
     setError(null);
     try {
-      await api.updatePrompt(prompt.agent_name, draft);
+      await api.updatePrompt(prompt.agent_name, draft, testMode);
       onSaved();
       onClose();
     } catch (e) {
@@ -245,9 +248,11 @@ function ChevronIcon({ open }: { open: boolean }) {
 function DeleteCell({
   agentName,
   onDeleted,
+  testMode,
 }: {
   agentName: string;
   onDeleted: () => void;
+  testMode: boolean;
 }) {
   const [confirm, setConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -259,7 +264,7 @@ function DeleteCell({
           onClick={async () => {
             setLoading(true);
             try {
-              await api.deletePrompt(agentName);
+              await api.deletePrompt(agentName, testMode);
               onDeleted();
             } catch (e) {
               alert(e instanceof Error ? e.message : String(e));
@@ -378,6 +383,7 @@ function AgentsTable({
   onToggle,
   onChildToggle,
   onAddChild,
+  testMode,
 }: {
   prompts: PromptInfo[];
   onEdit: (p: { agent_name: string; content: string }) => void;
@@ -389,6 +395,7 @@ function AgentsTable({
     active: boolean,
   ) => void;
   onAddChild: (parentName: string) => void;
+  testMode: boolean;
 }) {
   const [toggling, setToggling] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -396,7 +403,7 @@ function AgentsTable({
   const handleToggle = async (p: PromptInfo) => {
     setToggling(p.agent_name);
     try {
-      await api.togglePromptActive(p.agent_name, !p.active);
+      await api.togglePromptActive(p.agent_name, !p.active, testMode);
       onToggle(p.agent_name, !p.active);
     } catch (e) {
       alert(e instanceof Error ? e.message : String(e));
@@ -411,7 +418,7 @@ function AgentsTable({
   ) => {
     setToggling(child.agent_name);
     try {
-      await api.togglePromptActive(child.agent_name, !child.active);
+      await api.togglePromptActive(child.agent_name, !child.active, testMode);
       onChildToggle(parentName, child.agent_name, !child.active);
     } catch (e) {
       alert(e instanceof Error ? e.message : String(e));
@@ -550,6 +557,7 @@ function AgentsTable({
                       <DeleteCell
                         agentName={p.agent_name}
                         onDeleted={onDeleted}
+                        testMode={testMode}
                       />
                     )}
                   </div>
@@ -615,6 +623,7 @@ function AgentsTable({
                         <DeleteCell
                           agentName={child.agent_name}
                           onDeleted={onDeleted}
+                          testMode={testMode}
                         />
                       </div>
                     </td>
@@ -714,10 +723,12 @@ function CreateDialog({
   onClose,
   onCreated,
   parentName,
+  testMode,
 }: {
   onClose: () => void;
   onCreated: () => void;
   parentName?: string;
+  testMode: boolean;
 }) {
   const isChild = Boolean(parentName);
   const [name, setName] = useState("");
@@ -744,14 +755,14 @@ function CreateDialog({
           child_weight: weightNum > 0 ? weightNum : null,
           content: content.trim(),
         };
-        await api.createChildPrompt(parentName!, payload);
+        await api.createChildPrompt(parentName!, payload, testMode);
       } else {
         const payload: CreatePromptPayload = {
           agent_name: name,
           weight: weightNum,
           content: content.trim(),
         };
-        await api.createPrompt(payload);
+        await api.createPrompt(payload, testMode);
       }
       onCreated();
     } catch (e) {
@@ -932,10 +943,11 @@ export default function PromptsPage() {
   } | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [showCreateChild, setShowCreateChild] = useState<string | null>(null); // parent agent_name
+  const { testMode } = useTestMode();
 
   const refresh = useCallback(async () => {
     try {
-      const data = await api.listPrompts();
+      const data = await api.listPrompts(testMode);
       setPrompts(data);
       setError(null);
     } catch (e) {
@@ -943,7 +955,7 @@ export default function PromptsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [testMode]);
 
   useEffect(() => {
     refresh();
@@ -1007,6 +1019,13 @@ export default function PromptsPage() {
           </button>
         </div>
 
+        {testMode && (
+          <div className="flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-400 shrink-0">
+            <span className="font-semibold">Test mode</span>
+            <span className="text-amber-400/70">— editing test prompts from <code className="font-mono text-xs">prompts/test/</code>. Changes do not affect production.</span>
+          </div>
+        )}
+
         {error && <p className="text-sm text-red-400 shrink-0">{error}</p>}
         {loading && (
           <p
@@ -1037,6 +1056,7 @@ export default function PromptsPage() {
                 onToggle={handleToggle}
                 onChildToggle={handleChildToggle}
                 onAddChild={(parentName) => setShowCreateChild(parentName)}
+                testMode={testMode}
               />
             )}
           </div>
@@ -1048,6 +1068,7 @@ export default function PromptsPage() {
           prompt={editing}
           onClose={() => setEditing(null)}
           onSaved={refresh}
+          testMode={testMode}
         />
       )}
 
@@ -1058,6 +1079,7 @@ export default function PromptsPage() {
             setShowCreate(false);
             refresh();
           }}
+          testMode={testMode}
         />
       )}
 
@@ -1069,6 +1091,7 @@ export default function PromptsPage() {
             setShowCreateChild(null);
             refresh();
           }}
+          testMode={testMode}
         />
       )}
     </main>

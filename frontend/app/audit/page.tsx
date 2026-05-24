@@ -13,14 +13,15 @@ import {
 
 const TEXT = "#D7DFE7";
 
-const AGENTS = [
+// Known agents in preferred display order; any other name falls after these.
+const KNOWN_ORDER = [
   "technical",
   "fundamental",
   "sentiment",
   "risk",
   "macro",
   "ceo",
-] as const;
+];
 
 const AGENT_COLORS: Record<string, string> = {
   technical: "bg-blue-500/15 text-blue-400",
@@ -73,12 +74,21 @@ function cellStatus(entry: AuditEntry): "ok" | "fallback" | "error" {
   return "ok";
 }
 
+/** Build a sorted list of all agent names found in entries.
+ *  Known agents come first (in KNOWN_ORDER), then custom/child agents alpha. */
+function activeAgentsFrom(entries: AuditEntry[]): string[] {
+  const all = Array.from(new Set(entries.map((e) => e.agent_name)));
+  const known = KNOWN_ORDER.filter((a) => all.includes(a));
+  const extra = all.filter((a) => !KNOWN_ORDER.includes(a)).sort();
+  return [...known, ...extra];
+}
+
 type MatrixData = {
   tickers: string[];
   matrix: Record<string, Record<string, AuditEntry | null>>;
 };
 
-function buildMatrix(entries: AuditEntry[]): MatrixData {
+function buildMatrix(entries: AuditEntry[], agentCols: string[]): MatrixData {
   const tickerSet = new Set<string>();
   const matrix: Record<string, Record<string, AuditEntry | null>> = {};
 
@@ -90,7 +100,7 @@ function buildMatrix(entries: AuditEntry[]): MatrixData {
 
   const tickers = Array.from(tickerSet).sort();
   for (const t of tickers) {
-    for (const a of AGENTS) {
+    for (const a of agentCols) {
       if (!(a in matrix[t])) matrix[t][a] = null;
     }
   }
@@ -98,7 +108,7 @@ function buildMatrix(entries: AuditEntry[]): MatrixData {
   return { tickers, matrix };
 }
 
-// ── Level 3: Detail modal (unchanged) ─────────────────────────────────────────
+// ── Level 3: Detail modal ─────────────────────────────────────────────────────
 
 type DetailTab = "prompt" | "response" | "parsed";
 
@@ -279,7 +289,6 @@ function RunDrawer({
 }) {
   const { date, time } = fmtDateTime(run.started_at);
 
-  // Summary stats
   const totalTokens = entries.reduce((s, e) => s + (e.tokens_used ?? 0), 0);
   const latencies = entries
     .filter((e) => e.latency_ms !== null)
@@ -289,12 +298,9 @@ function RunDrawer({
     : null;
   const errorCount = entries.filter((e) => e.parsed_output === null).length;
 
-  const { tickers, matrix } = buildMatrix(entries);
-
-  // Only show agents that have at least one entry
-  const activeAgents = AGENTS.filter((a) =>
-    entries.some((e) => e.agent_name === a),
-  );
+  // All agents found in this run, known ones first, then custom/child agents
+  const activeAgents = activeAgentsFrom(entries);
+  const { tickers, matrix } = buildMatrix(entries, activeAgents);
 
   return (
     <div
@@ -303,7 +309,6 @@ function RunDrawer({
     >
       {/* Header */}
       <div className="flex-none px-6 py-4 border-b border-[#2a2a2a] space-y-3">
-        {/* Row 1: title + close */}
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3 flex-wrap">
             <span
@@ -313,6 +318,11 @@ function RunDrawer({
               {run.process_id}
             </span>
             <StatusBadge status={run.status} />
+            {run.test_mode && (
+              <span className="rounded px-2 py-0.5 text-xs font-medium bg-amber-500/15 text-amber-400">
+                test
+              </span>
+            )}
             <span className="text-xs" style={{ color: TEXT, opacity: 0.55 }}>
               {date} · {time}
             </span>
@@ -326,7 +336,6 @@ function RunDrawer({
           </button>
         </div>
 
-        {/* Row 2: meta pills */}
         <div
           className="flex items-center gap-4 text-xs"
           style={{ color: TEXT, opacity: 0.6 }}
@@ -338,7 +347,6 @@ function RunDrawer({
           <span>{fmtDuration(run.duration_seconds)}</span>
         </div>
 
-        {/* Row 3: summary stats */}
         {!loading && entries.length > 0 && (
           <div className="flex gap-3">
             {[
@@ -381,7 +389,7 @@ function RunDrawer({
         )}
       </div>
 
-      {/* Matrix / loading / error */}
+      {/* Matrix */}
       {loading ? (
         <div className="flex-1 flex items-center justify-center">
           <span className="text-sm text-muted-foreground animate-pulse">
@@ -448,27 +456,79 @@ function RunDrawer({
   );
 }
 
+// ── Inner tabs ────────────────────────────────────────────────────────────────
+
+type AuditTab = "production" | "test";
+
+function InnerTabs({
+  active,
+  onChange,
+  productionCount,
+  testCount,
+}: {
+  active: AuditTab;
+  onChange: (t: AuditTab) => void;
+  productionCount: number;
+  testCount: number;
+}) {
+  const tabs: { id: AuditTab; label: string; count: number }[] = [
+    { id: "production", label: "Production", count: productionCount },
+    { id: "test", label: "Test runs", count: testCount },
+  ];
+
+  return (
+    <div className="flex gap-1 border-b border-border px-6">
+      {tabs.map((t) => (
+        <button
+          key={t.id}
+          onClick={() => onChange(t.id)}
+          className={[
+            "flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors",
+            active === t.id
+              ? "border-blue-500 text-blue-400"
+              : "border-transparent hover:border-[#2a2a2a]",
+          ].join(" ")}
+          style={{ color: active === t.id ? undefined : TEXT }}
+        >
+          {t.label}
+          {t.count > 0 && (
+            <span
+              className={`rounded-full px-1.5 py-0.5 text-xs font-medium ${
+                t.id === "test"
+                  ? active === t.id
+                    ? "bg-amber-500/20 text-amber-400"
+                    : "bg-amber-500/10 text-amber-500"
+                  : active === t.id
+                    ? "bg-blue-500/20 text-blue-400"
+                    : "bg-muted text-muted-foreground"
+              }`}
+            >
+              {t.count}
+            </span>
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function AuditPage() {
-  // Level 1
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [runsLoading, setRunsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<AuditTab>("production");
 
-  // Level 2
   const [selectedRun, setSelectedRun] = useState<RunSummary | null>(null);
   const [runEntries, setRunEntries] = useState<AuditEntry[]>([]);
   const [runEntriesLoading, setRunEntriesLoading] = useState(false);
   const [runEntriesError, setRunEntriesError] = useState<string | null>(null);
 
-  // Level 3
   const [selectedEntry, setSelectedEntry] = useState<AuditEntry | null>(null);
 
-  // Keep a ref to selectedEntry so the keydown handler can read it without stale closure
   const selectedEntryRef = useRef<AuditEntry | null>(null);
   selectedEntryRef.current = selectedEntry;
 
-  // Fetch runs list
   const fetchRuns = useCallback(async () => {
     try {
       const list = await api.listRuns(1, 100);
@@ -483,6 +543,12 @@ export default function AuditPage() {
   useEffect(() => {
     fetchRuns();
   }, [fetchRuns]);
+
+  // Clear selected run when switching tabs
+  const handleTabChange = (tab: AuditTab) => {
+    setActiveTab(tab);
+    setSelectedRun(null);
+  };
 
   // Fetch entries when a run is selected
   useEffect(() => {
@@ -512,160 +578,172 @@ export default function AuditPage() {
     };
   }, [selectedRun]);
 
-  // Escape key: close DetailModal first, then drawer
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      if (selectedEntryRef.current) return; // DetailModal handles its own Escape
+      if (selectedEntryRef.current) return;
       setSelectedRun(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  const productionRuns = runs.filter((r) => !r.test_mode);
+  const testRuns = runs.filter((r) => r.test_mode);
+  const visibleRuns = activeTab === "production" ? productionRuns : testRuns;
+
   return (
-    <main className="fixed inset-0 top-12 bg-background flex flex-row overflow-hidden">
-      {/* ── Level 1: Runs list ── */}
-      <div
-        className="flex flex-col overflow-hidden transition-all duration-200"
-        style={{
-          width: selectedRun ? "25%" : "80%",
-          minWidth: selectedRun ? "220px" : undefined,
-          margin: selectedRun ? undefined : "0 auto",
-        }}
-      >
-        {/* Header */}
-        <div className="flex-none px-6 py-5 border-b border-border">
-          <h1
-            className="text-xl font-bold tracking-tight"
-            style={{ color: TEXT }}
-          >
+    <main className="fixed inset-0 top-12 bg-background flex flex-col overflow-hidden">
+      {/* Page header + inner tabs */}
+      <div className="flex-none border-b border-border">
+        <div className="px-6 py-4">
+          <h1 className="text-xl font-bold tracking-tight" style={{ color: TEXT }}>
             Audit Log
           </h1>
           <p className="text-xs mt-1" style={{ color: TEXT, opacity: 0.55 }}>
-            Click a run to inspect LLM calls.
+            Click a run to inspect every LLM call — prompt, raw response, and parsed output.
           </p>
         </div>
-
-        {/* Table */}
-        <div className="flex-1 overflow-y-auto min-h-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead style={{ color: TEXT }}>Started</TableHead>
-                {!selectedRun && (
-                  <TableHead style={{ color: TEXT }}>Process</TableHead>
-                )}
-                {!selectedRun && (
-                  <TableHead style={{ color: TEXT }}>Variant</TableHead>
-                )}
-                <TableHead style={{ color: TEXT }}>Status</TableHead>
-                {!selectedRun && (
-                  <TableHead className="text-right" style={{ color: TEXT }}>
-                    Stocks
-                  </TableHead>
-                )}
-                {!selectedRun && (
-                  <TableHead className="text-right" style={{ color: TEXT }}>
-                    Duration
-                  </TableHead>
-                )}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {runsLoading ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={6}
-                    className="text-center text-muted-foreground py-12"
-                  >
-                    Loading…
-                  </TableCell>
-                </TableRow>
-              ) : runs.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={6}
-                    className="text-center text-muted-foreground py-12"
-                  >
-                    No runs yet. Run the pipeline to see results here.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                runs.map((r) => {
-                  const isSelected = selectedRun?.run_id === r.run_id;
-                  const { date, time } = fmtDateTime(r.started_at);
-                  return (
-                    <TableRow
-                      key={r.run_id}
-                      className={`cursor-pointer transition-colors ${
-                        isSelected
-                          ? "border-l-2 border-blue-400 bg-blue-500/5 hover:bg-blue-500/8"
-                          : "hover:bg-muted/20"
-                      }`}
-                      onClick={() => setSelectedRun(isSelected ? null : r)}
-                    >
-                      <TableCell className="font-mono" style={{ color: TEXT }}>
-                        <span className="text-[10px] opacity-55 block">
-                          {date}
-                        </span>
-                        <span className="text-xs">{time}</span>
-                      </TableCell>
-                      {!selectedRun && (
-                        <TableCell
-                          className="font-mono text-xs max-w-[180px] truncate"
-                          style={{ color: TEXT }}
-                        >
-                          {r.process_id}
-                        </TableCell>
-                      )}
-                      {!selectedRun && (
-                        <TableCell
-                          className="font-mono text-xs"
-                          style={{ color: TEXT }}
-                        >
-                          {r.model_variant_id}
-                        </TableCell>
-                      )}
-                      <TableCell>
-                        <StatusBadge status={r.status} />
-                      </TableCell>
-                      {!selectedRun && (
-                        <TableCell
-                          className="text-right text-sm"
-                          style={{ color: TEXT }}
-                        >
-                          {r.total_stocks}
-                        </TableCell>
-                      )}
-                      {!selectedRun && (
-                        <TableCell
-                          className="text-right font-mono text-xs"
-                          style={{ color: TEXT }}
-                        >
-                          {fmtDuration(r.duration_seconds)}
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </div>
+        <InnerTabs
+          active={activeTab}
+          onChange={handleTabChange}
+          productionCount={productionRuns.length}
+          testCount={testRuns.length}
+        />
       </div>
 
-      {/* ── Level 2: Run drawer ── */}
-      {selectedRun && (
-        <RunDrawer
-          run={selectedRun}
-          entries={runEntries}
-          loading={runEntriesLoading}
-          error={runEntriesError}
-          onClose={() => setSelectedRun(null)}
-          onCellClick={setSelectedEntry}
-        />
-      )}
+      {/* Content: runs list + optional drawer */}
+      <div className="flex flex-row flex-1 overflow-hidden">
+        {/* ── Level 1: Runs list ── */}
+        <div
+          className="flex flex-col overflow-hidden transition-all duration-200"
+          style={{
+            width: selectedRun ? "25%" : "80%",
+            minWidth: selectedRun ? "220px" : undefined,
+            margin: selectedRun ? undefined : "0 auto",
+          }}
+        >
+          <div className="flex-1 overflow-y-auto min-h-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead style={{ color: TEXT }}>Started</TableHead>
+                  {!selectedRun && (
+                    <TableHead style={{ color: TEXT }}>Process</TableHead>
+                  )}
+                  {!selectedRun && (
+                    <TableHead style={{ color: TEXT }}>Variant</TableHead>
+                  )}
+                  <TableHead style={{ color: TEXT }}>Status</TableHead>
+                  {!selectedRun && (
+                    <TableHead className="text-right" style={{ color: TEXT }}>
+                      Stocks
+                    </TableHead>
+                  )}
+                  {!selectedRun && (
+                    <TableHead className="text-right" style={{ color: TEXT }}>
+                      Duration
+                    </TableHead>
+                  )}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {runsLoading ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={6}
+                      className="text-center text-muted-foreground py-12"
+                    >
+                      Loading…
+                    </TableCell>
+                  </TableRow>
+                ) : visibleRuns.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={6}
+                      className="text-center text-muted-foreground py-12"
+                    >
+                      {activeTab === "test"
+                        ? "No test runs yet. Enable Test mode in the NavBar and run the pipeline."
+                        : "No production runs yet. Run the pipeline to see results here."}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  visibleRuns.map((r) => {
+                    const isSelected = selectedRun?.run_id === r.run_id;
+                    const { date, time } = fmtDateTime(r.started_at);
+                    return (
+                      <TableRow
+                        key={r.run_id}
+                        className={`cursor-pointer transition-colors ${
+                          isSelected
+                            ? "border-l-2 border-blue-400 bg-blue-500/5 hover:bg-blue-500/8"
+                            : "hover:bg-muted/20"
+                        }`}
+                        onClick={() => setSelectedRun(isSelected ? null : r)}
+                      >
+                        <TableCell className="font-mono" style={{ color: TEXT }}>
+                          <span className="text-[10px] opacity-55 block">
+                            {date}
+                          </span>
+                          <span className="text-xs">{time}</span>
+                        </TableCell>
+                        {!selectedRun && (
+                          <TableCell
+                            className="font-mono text-xs max-w-[180px] truncate"
+                            style={{ color: TEXT }}
+                          >
+                            {r.process_id}
+                          </TableCell>
+                        )}
+                        {!selectedRun && (
+                          <TableCell
+                            className="font-mono text-xs"
+                            style={{ color: TEXT }}
+                          >
+                            {r.model_variant_id}
+                          </TableCell>
+                        )}
+                        <TableCell>
+                          <StatusBadge status={r.status} />
+                        </TableCell>
+                        {!selectedRun && (
+                          <TableCell
+                            className="text-right text-sm"
+                            style={{ color: TEXT }}
+                          >
+                            {r.total_stocks}
+                          </TableCell>
+                        )}
+                        {!selectedRun && (
+                          <TableCell
+                            className="text-right font-mono text-xs"
+                            style={{ color: TEXT }}
+                          >
+                            {fmtDuration(r.duration_seconds)}
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+
+        {/* ── Level 2: Run drawer ── */}
+        {selectedRun && (
+          <RunDrawer
+            run={selectedRun}
+            entries={runEntries}
+            loading={runEntriesLoading}
+            error={runEntriesError}
+            onClose={() => setSelectedRun(null)}
+            onCellClick={setSelectedEntry}
+          />
+        )}
+      </div>
 
       {/* ── Level 3: Detail modal ── */}
       {selectedEntry && (

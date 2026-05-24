@@ -55,11 +55,11 @@ agents:
     is_system: true
     weight: 0.0
     active: true
-    prompt_file: prompts/orchestrator_prompt.md
-    default_variant: claude_sonnet
+    prompt_file: prompts/test/technical_prompt.md
+    default_variant: llama_3_3_70b
     fallback_variant: gemini_flash
-    max_tokens: 2000
-    timeout_seconds: 60
+    max_tokens: 500
+    timeout_seconds: 30
     enable_web_search: false
     enable_deep_search: false
     parent: null
@@ -68,11 +68,11 @@ agents:
     is_system: false
     weight: 0.3
     active: true
-    prompt_file: prompts/technical_prompt.md
-    default_variant: claude_sonnet
+    prompt_file: prompts/test/technical_prompt.md
+    default_variant: llama_3_3_70b
     fallback_variant: gemini_flash
-    max_tokens: 2000
-    timeout_seconds: 60
+    max_tokens: 500
+    timeout_seconds: 30
     enable_web_search: false
     enable_deep_search: false
     parent: null
@@ -80,12 +80,12 @@ agents:
   fundamental:
     is_system: false
     weight: 0.25
-    active: true
-    prompt_file: prompts/fundamental_prompt.md
-    default_variant: claude_sonnet
+    active: false
+    prompt_file: prompts/test/fundamental_prompt.md
+    default_variant: llama_3_3_70b
     fallback_variant: gemini_flash
-    max_tokens: 2000
-    timeout_seconds: 60
+    max_tokens: 500
+    timeout_seconds: 30
     enable_web_search: false
     enable_deep_search: false
     parent: null
@@ -94,12 +94,12 @@ agents:
     is_system: false
     weight: 0.2
     active: false
-    prompt_file: prompts/sentiment_prompt.md
-    default_variant: claude_sonnet
+    prompt_file: prompts/test/sentiment_prompt.md
+    default_variant: llama_3_3_70b
     fallback_variant: gemini_flash
-    max_tokens: 2000
-    timeout_seconds: 60
-    enable_web_search: true
+    max_tokens: 500
+    timeout_seconds: 30
+    enable_web_search: false
     enable_deep_search: false
     parent: null
     child_weight: null
@@ -107,11 +107,11 @@ agents:
     is_system: false
     weight: 0.15
     active: false
-    prompt_file: prompts/risk_prompt.md
-    default_variant: claude_sonnet
+    prompt_file: prompts/test/risk_prompt.md
+    default_variant: llama_3_3_70b
     fallback_variant: gemini_flash
-    max_tokens: 2000
-    timeout_seconds: 60
+    max_tokens: 500
+    timeout_seconds: 30
     enable_web_search: false
     enable_deep_search: false
     parent: null
@@ -120,12 +120,12 @@ agents:
     is_system: false
     weight: 0.1
     active: false
-    prompt_file: prompts/macro_prompt.md
-    default_variant: claude_sonnet
+    prompt_file: prompts/test/macro_prompt.md
+    default_variant: llama_3_3_70b
     fallback_variant: gemini_flash
-    max_tokens: 2000
-    timeout_seconds: 60
-    enable_web_search: true
+    max_tokens: 500
+    timeout_seconds: 30
+    enable_web_search: false
     enable_deep_search: false
     parent: null
     child_weight: null
@@ -133,21 +133,21 @@ agents:
     is_system: true
     weight: 0.0
     active: true
-    prompt_file: prompts/ceo_prompt.md
-    default_variant: claude_sonnet
+    prompt_file: prompts/test/ceo_prompt.md
+    default_variant: llama_3_3_70b
     fallback_variant: gemini_flash
-    max_tokens: 8000
-    timeout_seconds: 180
+    max_tokens: 1000
+    timeout_seconds: 60
     enable_web_search: false
     enable_deep_search: false
     parent: null
     child_weight: null
-  mom:
+  momtest:
     is_system: false
     weight: 0.0
     active: true
-    prompt_file: prompts/mom_prompt.md
-    default_variant: claude_sonnet
+    prompt_file: prompts/test/momtest_prompt.md
+    default_variant: llama_3_3_70b
     fallback_variant: gemini_flash
     max_tokens: 2000
     timeout_seconds: 45
@@ -157,7 +157,7 @@ agents:
     child_weight: null
 pipeline:
   ceo_autonomous: false
-  chunk_size: 5
+  chunk_size: 2
   active_variants:
   - llama_3_3_70b
   compare_when_multiple: true

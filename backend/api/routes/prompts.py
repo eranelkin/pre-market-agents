@@ -2,13 +2,15 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from backend.agents_config_loader import (
     AgentConfig,
     add_agent,
     get_agents_config,
+    get_config,
+    get_loader,
     remove_agent,
     set_agent_active,
 )
@@ -86,9 +88,9 @@ def _read_child_prompt(name: str, agent: AgentConfig) -> dict:
 
 
 @router.get("/prompts")
-async def list_prompts():
+async def list_prompts(test_mode: bool = Query(False)):
     """Return top-level agent prompts with children embedded. Child agents are not in the top list."""
-    cfg = get_agents_config()
+    cfg = get_config(test_mode)
     result = []
     for name, agent in cfg.agents.items():
         if agent.parent is not None:
@@ -102,9 +104,10 @@ async def list_prompts():
 
 
 @router.post("/prompts", status_code=201)
-async def create_prompt(body: PromptCreateRequest):
+async def create_prompt(body: PromptCreateRequest, test_mode: bool = Query(False)):
     """Create a new custom agent: write the .md file and add an entry to agents_config.yaml."""
-    cfg = get_agents_config()
+    loader = get_loader(test_mode)
+    cfg = get_config(test_mode)
 
     if body.agent_name in cfg.agents:
         raise HTTPException(409, f"Agent '{body.agent_name}' already exists")
@@ -115,15 +118,16 @@ async def create_prompt(body: PromptCreateRequest):
     if not variant_id or not any(v.id == variant_id for v in cfg.model_variants):
         raise HTTPException(422, f"Variant '{variant_id}' not found in model_variants")
 
-    prompt_file = f"prompts/{body.agent_name}_prompt.md"
+    prompt_file = f"prompts/test/{body.agent_name}_prompt.md" if test_mode else f"prompts/{body.agent_name}_prompt.md"
     path = _PROJECT_ROOT / prompt_file
     try:
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(body.content, encoding="utf-8")
     except Exception as exc:
         raise HTTPException(500, f"Failed to write prompt file: {exc}")
 
     try:
-        add_agent(
+        loader.add_agent(
             body.agent_name,
             AgentConfig(
                 weight=body.weight,
@@ -140,9 +144,10 @@ async def create_prompt(body: PromptCreateRequest):
 
 
 @router.post("/prompts/{parent_name}/children", status_code=201)
-async def create_child_prompt(parent_name: str, body: ChildPromptCreateRequest):
+async def create_child_prompt(parent_name: str, body: ChildPromptCreateRequest, test_mode: bool = Query(False)):
     """Create a child sub-agent under an existing custom agent."""
-    cfg = get_agents_config()
+    loader = get_loader(test_mode)
+    cfg = get_config(test_mode)
 
     if parent_name not in cfg.agents:
         raise HTTPException(404, f"Agent '{parent_name}' not found")
@@ -154,15 +159,16 @@ async def create_child_prompt(parent_name: str, body: ChildPromptCreateRequest):
     if body.agent_name in cfg.agents:
         raise HTTPException(409, f"Agent '{body.agent_name}' already exists")
 
-    prompt_file = f"prompts/{body.agent_name}_prompt.md"
+    prompt_file = f"prompts/test/{body.agent_name}_prompt.md" if test_mode else f"prompts/{body.agent_name}_prompt.md"
     path = _PROJECT_ROOT / prompt_file
     try:
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(body.content, encoding="utf-8")
     except Exception as exc:
         raise HTTPException(500, f"Failed to write prompt file: {exc}")
 
     try:
-        add_agent(
+        loader.add_agent(
             body.agent_name,
             AgentConfig(
                 weight=0.0,
@@ -186,38 +192,39 @@ async def create_child_prompt(parent_name: str, body: ChildPromptCreateRequest):
 # so FastAPI doesn't confuse "active" for an agent name on PATCH requests.
 
 @router.patch("/prompts/{agent_name}/active")
-async def toggle_prompt_active(agent_name: str, body: PromptActiveRequest):
+async def toggle_prompt_active(agent_name: str, body: PromptActiveRequest, test_mode: bool = Query(False)):
     """Enable or disable an analysis agent in the pipeline."""
-    cfg = get_agents_config()
+    cfg = get_config(test_mode)
     if agent_name not in cfg.agents:
         raise HTTPException(404, f"Agent '{agent_name}' not found")
     if cfg.agents[agent_name].is_system:
         raise HTTPException(400, f"System agent '{agent_name}' cannot be toggled")
     try:
-        set_agent_active(agent_name, body.active)
+        get_loader(test_mode).set_agent_active(agent_name, body.active)
     except (KeyError, ValueError) as exc:
         raise HTTPException(400, str(exc))
     return {"status": "updated", "agent_name": agent_name, "active": body.active}
 
 
 @router.get("/prompts/{agent_name}")
-async def get_prompt(agent_name: str):
+async def get_prompt(agent_name: str, test_mode: bool = Query(False)):
     """Return a single agent's prompt content."""
-    cfg = get_agents_config()
+    cfg = get_config(test_mode)
     if agent_name not in cfg.agents:
         raise HTTPException(404, f"Agent '{agent_name}' not found")
     return _read_prompt(agent_name, cfg.agents[agent_name])
 
 
 @router.patch("/prompts/{agent_name}")
-async def update_prompt(agent_name: str, body: PromptUpdateRequest):
+async def update_prompt(agent_name: str, body: PromptUpdateRequest, test_mode: bool = Query(False)):
     """Write new content to the agent's prompt file and hot-reload."""
-    cfg = get_agents_config()
+    cfg = get_config(test_mode)
     if agent_name not in cfg.agents:
         raise HTTPException(404, f"Agent '{agent_name}' not found")
 
     path = _PROJECT_ROOT / cfg.agents[agent_name].prompt_file
     try:
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(body.content, encoding="utf-8")
     except Exception as exc:
         raise HTTPException(500, f"Failed to write prompt file: {exc}")
@@ -227,9 +234,10 @@ async def update_prompt(agent_name: str, body: PromptUpdateRequest):
 
 
 @router.delete("/prompts/{agent_name}")
-async def delete_prompt(agent_name: str):
+async def delete_prompt(agent_name: str, test_mode: bool = Query(False)):
     """Delete a custom agent and cascade-delete its children if it has any."""
-    cfg = get_agents_config()
+    loader = get_loader(test_mode)
+    cfg = get_config(test_mode)
     if agent_name not in cfg.agents:
         raise HTTPException(404, f"Agent '{agent_name}' not found")
     if cfg.agents[agent_name].is_system:
@@ -239,12 +247,12 @@ async def delete_prompt(agent_name: str):
     children = cfg.get_children(agent_name)
     deleted_children = []
     for child_name, child_cfg in children:
-        remove_agent(child_name)
+        loader.remove_agent(child_name)
         (_PROJECT_ROOT / child_cfg.prompt_file).unlink(missing_ok=True)
         deleted_children.append(child_name)
 
     prompt_file = cfg.agents[agent_name].prompt_file
-    remove_agent(agent_name)
+    loader.remove_agent(agent_name)
     (_PROJECT_ROOT / prompt_file).unlink(missing_ok=True)
 
     reload_prompts()

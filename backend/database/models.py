@@ -49,6 +49,7 @@ class Run(Base):
         nullable=False,
     )
     model_variant_id: Mapped[str] = mapped_column(sa.String(100), nullable=False)
+    test_mode: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, default=False)
     provider_used: Mapped[str | None] = mapped_column(sa.String(50), nullable=True)
     model_used: Mapped[str | None] = mapped_column(sa.String(100), nullable=True)
     status: Mapped[str] = mapped_column(sa.String(20), nullable=False, default="pending")

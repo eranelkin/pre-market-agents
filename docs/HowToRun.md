@@ -2,6 +2,20 @@
 
 ---
 
+## Contents
+
+- [Before You Start — What You'll Need](#before-you-start--what-youll-need)
+- [Option A — Developer Mode (Hot Reload, Fastest Iteration)](#option-a--developer-mode-hot-reload-fastest-iteration)
+- [Option B — Docker (Recommended for Fresh Setup, Easiest)](#option-b--docker-recommended-for-fresh-setup-easiest)
+- [Option C — Manual Setup (No Docker)](#option-c--manual-setup-no-docker)
+- [Option D — Bare Minimum (No Database, Quick Test Only)](#option-d--bare-minimum-no-database-quick-test-only)
+- [Test Mode](#test-mode)
+- [End-to-End Pipeline Test](#end-to-end-pipeline-test)
+- [Audit Log](#audit-log)
+- [Troubleshooting](#troubleshooting)
+
+---
+
 ## Before You Start — What You'll Need
 
 This app uses AI to analyze stocks. You need **at least one AI API key** to make it work.
@@ -264,6 +278,94 @@ This is only useful if you just want to quickly see if the AI analysis works.
    DATABASE_URL=sqlite+aiosqlite:///./test.db uvicorn backend.main:app --port 3301
    ```
 5. Start the frontend as in steps 11–12 above
+
+---
+
+## Test Mode
+
+Test mode is a global toggle visible in the **NavBar** on every page (amber when on). It isolates the entire UI into a separate config so you can run test pipelines, edit stub prompts, and change active variants without touching your production setup.
+
+### What test mode affects
+
+| Area | Production (toggle off) | Test mode (toggle on) |
+|---|---|---|
+| **Run Analysis** | Uses `agents_config.yaml` and `prompts/*.md` | Uses `agents_config.test.yaml` and `prompts/test/*.md` |
+| **Models tab** | Shows/edits active variants from `agents_config.yaml` | Shows/edits active variants from `agents_config.test.yaml` |
+| **Prompts tab** | Reads/writes `prompts/*.md` | Reads/writes `prompts/test/*.md` |
+
+Editing a prompt in test mode **never touches production files**. Turning the toggle off immediately switches back. State persists across page navigation and browser refresh.
+
+---
+
+## End-to-End Pipeline Test
+
+> Use this to validate the full pipeline works correctly without spending real API budget.
+> Requires Option A (Developer Mode) to already be set up and running.
+
+This runs all 5 agents with minimal stub prompts against 3 purpose-built test stocks, each designed to trigger a different code path including both CEO override rules. No backend restart needed — just flip the toggle in the NavBar.
+
+### 1. Enable Test Mode
+
+Click the **Test mode** toggle in the NavBar (top of every page). It turns amber when on.
+
+An amber banner appears on the Models and Prompts pages confirming which config is active:
+- Models: *"Editing test config — changes save to agents_config.test.yaml"*
+- Prompts: *"Editing test prompts — changes save to prompts/test/"*
+- Run Analysis dialog: *"Test mode — uses stub prompts & agents_config.test.yaml. Fast, free, no real analysis."*
+
+### 2. Upload the Test Input File
+
+Click **Run Analysis**, then upload:
+
+```
+input_examples/test_stocks.json
+```
+
+Click **Run**. The pipeline completes in seconds using Groq (free tier) with stub prompts.
+
+### 3. Expected Results
+
+| Ticker | Expected Result | What it tests |
+|---|---|---|
+| **NORM** | BUY | Happy path — all 5 agents run, CEO scores normally, no overrides |
+| **EXRK** | HOLD + override flag | `short_interest=42%` → `risk_level=extreme` → CEO caps final score at 50 |
+| **WEAK** | SELL + override flag | `rsi=18` → `tech_score=20` and `eps_growth=-45%` → `fund_score=20` → CEO forces SELL minimum |
+
+If all three results appear with the correct recommendations and EXRK/WEAK show override flags, the full pipeline is working correctly.
+
+### 4. Switch Back to Production Mode
+
+Click the **Test mode** toggle again to turn it off. The next run, prompt edit, and variant toggle will all use the real `agents_config.yaml` and your production prompts. No restart required.
+
+> **Note:** You can also start the backend in permanent test mode (useful for a full dev session focused on testing) by running `make dev-backend-test` instead of `make dev-backend`. The UI toggle works on top of either backend mode.
+
+---
+
+## Audit Log
+
+The **Audit** tab lets you inspect every LLM call made during any run — the exact prompt sent, the raw model response, and the parsed output. Click any run in the list to open the drawer, then click any cell in the matrix to see the full detail for that agent × ticker combination.
+
+### Production / Test tabs
+
+The audit list is split into two inner tabs:
+
+| Tab | Shows |
+|---|---|
+| **Production** | Runs started with Test mode **off** |
+| **Test runs** | Runs started with Test mode **on** |
+
+The tab counter updates automatically as runs complete. Switching tabs clears the open drawer.
+
+### Agent matrix
+
+Each run opens a heatmap with one row per stock and one column per agent. Columns are built dynamically from whatever agents ran — the 5 standard agents (Technical, Fundamental, Sentiment, Risk, Macro) plus the CEO, and any custom or sub-agents you have configured appear automatically to the right of the standard columns.
+
+Each cell shows:
+- A **green / amber / red dot** — green = parsed OK, amber = fallback model used, red = parse failed
+- **Latency** in ms (green < 2 s, yellow 2–5 s, red > 5 s)
+- A **"web"** label when the agent used a web search tool
+
+Click any cell to open the detail view with three sub-tabs: **Prompt**, **Response**, and **Parsed Output**.
 
 ---
 

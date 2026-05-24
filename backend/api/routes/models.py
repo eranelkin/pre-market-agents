@@ -1,10 +1,12 @@
 import time
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from backend.agents_config_loader import (
     add_variant,
     get_agents_config,
+    get_config,
+    get_loader,
     reload_agents_config,
     remove_variant,
     set_variant_active,
@@ -70,9 +72,9 @@ def _build_variant_detail(cfg, v) -> VariantDetail:
 # ── Endpoints ──────────────────────────────────────────────────────────────────
 
 @router.get("/models")
-async def get_models():
+async def get_models(test_mode: bool = Query(False)):
     """Return all configured model variants with live status (key present or not)."""
-    cfg = get_agents_config()
+    cfg = get_config(test_mode)
     variants = [_build_variant_detail(cfg, v) for v in cfg.model_variants]
     return {
         "variants": [d.model_dump() for d in variants],
@@ -135,10 +137,10 @@ async def delete_model_variant(variant_id: str):
 
 
 @router.patch("/models/variants/{variant_id}/active")
-async def toggle_variant_active(variant_id: str, body: ToggleActiveRequest):
+async def toggle_variant_active(variant_id: str, body: ToggleActiveRequest, test_mode: bool = Query(False)):
     """Toggle a variant's presence in pipeline.active_variants."""
     try:
-        new_cfg = set_variant_active(variant_id, body.active)
+        new_cfg = get_loader(test_mode).set_variant_active(variant_id, body.active)
     except (KeyError, ValueError) as exc:
         raise HTTPException(400, str(exc))
     return {"status": "updated", "active_variants": new_cfg.pipeline.active_variants}
@@ -175,9 +177,9 @@ async def test_model_variant(variant_id: str):
 
 
 @router.post("/models/reload")
-async def reload_models():
-    """Hot-reload agents_config.yaml from disk without restarting the server."""
-    cfg = reload_agents_config()
+async def reload_models(test_mode: bool = Query(False)):
+    """Hot-reload agents_config.yaml (or test yaml) from disk without restarting."""
+    cfg = get_loader(test_mode).reload()
     return {
         "status": "reloaded",
         "active_variants": cfg.pipeline.active_variants,

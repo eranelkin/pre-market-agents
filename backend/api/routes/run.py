@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.api.dependencies import get_db
-from backend.agents_config_loader import get_agents_config
+from backend.agents_config_loader import get_agents_config, load_config_for_run, run_config_context
 from backend.database.connection import AsyncSessionLocal
 from backend.database.models import (
     AgentResult as AgentResultORM,
@@ -45,6 +45,7 @@ async def start_run(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     chunk_size: int = Form(5),
+    test_mode: bool = Form(False),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -91,6 +92,7 @@ async def start_run(
             run_id=run_id,
             session_id=session_id,
             model_variant_id=variant_id,
+            test_mode=test_mode,
             status="pending",
             total_stocks=len(input_file.stocks),
         )
@@ -106,6 +108,7 @@ async def start_run(
         process_id=process_id,
         variant_run_ids=variant_run_ids,
         chunk_size=chunk_size,
+        test_mode=test_mode,
     )
 
     log.info(
@@ -183,6 +186,7 @@ async def list_runs(
                 run_id=run.run_id,
                 process_id=sess.process_id if sess else "",
                 model_variant_id=run.model_variant_id,
+                test_mode=run.test_mode,
                 status=run.status,
                 total_stocks=run.total_stocks,
                 started_at=run.started_at.isoformat(),
@@ -343,6 +347,7 @@ async def _pipeline_task(
     process_id: str,
     variant_run_ids: dict[str, uuid.UUID],
     chunk_size: int = 5,
+    test_mode: bool = False,
 ):
     # Immediately mark all runs as "running" so SSE DB-polling sees a live status.
     async with AsyncSessionLocal() as db:
@@ -354,18 +359,22 @@ async def _pipeline_task(
             )
         await db.commit()
 
+    cfg = load_config_for_run(test_mode)
+    log.info("pipeline_config", session_id=str(session_id), test_mode=test_mode, config_agents=list(cfg.agents.keys()))
+
     try:
         runner = VariantRunner()
-        result = await asyncio.wait_for(
-            runner.run(
-                stocks=stocks,
-                session_id=session_id,
-                process_id=process_id,
-                variant_run_ids=variant_run_ids,
-                chunk_size=chunk_size,
-            ),
-            timeout=900.0,  # 15-minute hard ceiling — catches any provider hang that escapes agent-level timeouts
-        )
+        async with run_config_context(cfg):
+            result = await asyncio.wait_for(
+                runner.run(
+                    stocks=stocks,
+                    session_id=session_id,
+                    process_id=process_id,
+                    variant_run_ids=variant_run_ids,
+                    chunk_size=chunk_size,
+                ),
+                timeout=900.0,  # 15-minute hard ceiling — catches any provider hang that escapes agent-level timeouts
+            )
         async with AsyncSessionLocal() as db:
             await _persist_results(db, session_id, result, variant_run_ids)
             await db.commit()

@@ -139,6 +139,7 @@ class RunSummaryResponse(BaseModel):
     run_id: UUID
     process_id: str
     model_variant_id: str
+    test_mode: bool = False
     status: str
     total_stocks: int
     started_at: str

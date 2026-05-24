@@ -5,6 +5,7 @@ export interface RunSummary {
   run_id: string;
   process_id: string;
   model_variant_id: string;
+  test_mode: boolean;
   status: string;
   total_stocks: number;
   started_at: string;
@@ -122,6 +123,11 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(`${res.status}: ${text}`);
   }
   return res.json() as Promise<T>;
+}
+
+function withMode(path: string, testMode?: boolean) {
+  if (!testMode) return path;
+  return `${path}${path.includes("?") ? "&" : "?"}test_mode=true`;
 }
 
 export interface VariantDetail {
@@ -243,10 +249,11 @@ export const api = {
   getComparison: (sessionId: string) =>
     apiFetch<ComparisonOutput>(`/api/v1/compare/${sessionId}`),
 
-  startRun: (file: File, chunkSize: number = 5) => {
+  startRun: (file: File, chunkSize: number = 5, testMode: boolean = false) => {
     const form = new FormData();
     form.append("file", file);
     form.append("chunk_size", String(chunkSize));
+    form.append("test_mode", String(testMode));
     return apiFetch<StartRunResponse>("/api/v1/run", { method: "POST", body: form });
   },
 
@@ -263,7 +270,7 @@ export const api = {
     `${BASE}/api/v1/run/${runId}/stream`,
 
   // ── Model management ──────────────────────────────────────────────────────
-  getVariants: () => apiFetch<ModelsResponse>("/api/v1/models"),
+  getVariants: (testMode?: boolean) => apiFetch<ModelsResponse>(withMode("/api/v1/models", testMode)),
 
   getPresets: () => apiFetch<ModelPreset[]>("/api/v1/models/presets"),
 
@@ -277,9 +284,9 @@ export const api = {
   deleteVariant: (id: string) =>
     apiFetch<{ status: string }>(`/api/v1/models/variants/${id}`, { method: "DELETE" }),
 
-  toggleVariantActive: (id: string, active: boolean) =>
+  toggleVariantActive: (id: string, active: boolean, testMode?: boolean) =>
     apiFetch<{ status: string; active_variants: string[] }>(
-      `/api/v1/models/variants/${id}/active`,
+      withMode(`/api/v1/models/variants/${id}/active`, testMode),
       { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active }) }
     ),
 
@@ -287,35 +294,35 @@ export const api = {
     apiFetch<TestConnectionResult>(`/api/v1/models/variants/${id}/test`, { method: "POST" }),
 
   // ── Prompt management ─────────────────────────────────────────────────────
-  listPrompts: () => apiFetch<PromptInfo[]>("/api/v1/prompts"),
+  listPrompts: (testMode?: boolean) => apiFetch<PromptInfo[]>(withMode("/api/v1/prompts", testMode)),
 
-  createPrompt: (payload: CreatePromptPayload) =>
+  createPrompt: (payload: CreatePromptPayload, testMode?: boolean) =>
     apiFetch<{ status: string; agent_name: string; prompt_file: string }>(
-      "/api/v1/prompts",
+      withMode("/api/v1/prompts", testMode),
       { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }
     ),
 
-  updatePrompt: (agentName: string, content: string) =>
+  updatePrompt: (agentName: string, content: string, testMode?: boolean) =>
     apiFetch<{ status: string; agent_name: string; char_count: number }>(
-      `/api/v1/prompts/${agentName}`,
+      withMode(`/api/v1/prompts/${agentName}`, testMode),
       { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content }) }
     ),
 
-  togglePromptActive: (agentName: string, active: boolean) =>
+  togglePromptActive: (agentName: string, active: boolean, testMode?: boolean) =>
     apiFetch<{ status: string; agent_name: string; active: boolean }>(
-      `/api/v1/prompts/${agentName}/active`,
+      withMode(`/api/v1/prompts/${agentName}/active`, testMode),
       { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active }) }
     ),
 
-  deletePrompt: (agentName: string) =>
+  deletePrompt: (agentName: string, testMode?: boolean) =>
     apiFetch<{ status: string; agent_name: string }>(
-      `/api/v1/prompts/${agentName}`,
+      withMode(`/api/v1/prompts/${agentName}`, testMode),
       { method: "DELETE" }
     ),
 
-  createChildPrompt: (parentName: string, payload: CreateChildPromptPayload) =>
+  createChildPrompt: (parentName: string, payload: CreateChildPromptPayload, testMode?: boolean) =>
     apiFetch<{ status: string; agent_name: string; parent: string; prompt_file: string }>(
-      `/api/v1/prompts/${parentName}/children`,
+      withMode(`/api/v1/prompts/${parentName}/children`, testMode),
       { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }
     ),
 
@@ -328,6 +335,7 @@ export const api = {
     agent_name?: string;
     ticker?: string;
     status?: string;
+    test_mode?: boolean;
     limit?: number;
     offset?: number;
   }) => {

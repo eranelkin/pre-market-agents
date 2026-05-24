@@ -1,11 +1,20 @@
+import contextlib
+import os
 import threading
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Optional
 
 import yaml
 from pydantic import BaseModel, Field, model_validator
 
-_CONFIG_PATH = Path("agents_config.yaml")
+_CONFIG_PATH = Path(os.environ.get("AGENTS_CONFIG", "agents_config.yaml"))
+
+# Per-run config override — set inside each background pipeline task so concurrent
+# test and production runs each see their own config without affecting the singleton.
+_run_config_override: ContextVar[Optional["AgentsConfig"]] = ContextVar(
+    "run_config_override", default=None
+)
 
 
 # ── Pydantic models for agents_config.yaml ────────────────────────────────────
@@ -301,13 +310,47 @@ class AgentsConfigLoader:
         return self._config
 
 
-# Module-level singleton — import this everywhere
+# Module-level singletons — import helpers below, not these directly
 _loader = AgentsConfigLoader()
+_test_loader = AgentsConfigLoader(Path("agents_config.test.yaml"))
+
+
+def get_loader(test_mode: bool) -> AgentsConfigLoader:
+    """Return the prod or test loader depending on mode."""
+    return _test_loader if test_mode else _loader
+
+
+def get_config(test_mode: bool) -> AgentsConfig:
+    """Return the prod or test config depending on mode."""
+    return get_loader(test_mode).config
 
 
 def get_agents_config() -> AgentsConfig:
-    """Returns the current validated config. Loads on first call."""
+    """Returns the per-run override config if set, otherwise the singleton."""
+    override = _run_config_override.get(None)
+    return override if override is not None else _loader.config
+
+
+def load_config_for_run(test_mode: bool) -> AgentsConfig:
+    """Load the appropriate config for a single pipeline run."""
+    if test_mode:
+        return AgentsConfigLoader(Path("agents_config.test.yaml")).load()
     return _loader.config
+
+
+@contextlib.asynccontextmanager
+async def run_config_context(cfg: AgentsConfig):
+    """
+    Async context manager that pins `cfg` as the active config for the current
+    task and all child tasks spawned via asyncio.gather / asyncio.create_task.
+    ContextVar tokens are asyncio-safe: each task inherits a snapshot of the
+    context at creation time, so test and production runs never bleed into each other.
+    """
+    token = _run_config_override.set(cfg)
+    try:
+        yield
+    finally:
+        _run_config_override.reset(token)
 
 
 def reload_agents_config() -> AgentsConfig:

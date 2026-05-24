@@ -1,0 +1,130 @@
+{
+  "stocks": [
+    {
+      "ticker": "NORM",
+      "company_name": "Normal Corp (Test — expect BUY)",
+      "sector": "Technology",
+      "market_cap_b": 50.0,
+      "technical": {
+        "rsi_14": 58.0,
+        "macd_signal": "bullish_crossover",
+        "ma_50": 145.0,
+        "ma_200": 132.0,
+        "volume_vs_avg": 1.2,
+        "atr_14": 2.5,
+        "support_level": 138.0,
+        "resistance_level": 155.0
+      },
+      "fundamental": {
+        "pe_ratio": 22.0,
+        "eps_growth_yoy": 0.12,
+        "revenue_growth_yoy": 0.09,
+        "gross_margin": 0.42,
+        "debt_to_equity": 0.8,
+        "free_cash_flow_b": 8.5
+      },
+      "sentiment": {
+        "analyst_rating": "buy",
+        "analyst_count": 20,
+        "news_sentiment_score": 0.65,
+        "social_sentiment": "positive"
+      },
+      "risk": {
+        "beta": 1.1,
+        "week_52_high": 158.0,
+        "week_52_low": 110.0,
+        "implied_volatility": 0.22,
+        "short_interest_pct": 1.5
+      },
+      "macro": {
+        "sector_momentum": "positive",
+        "index_correlation": 0.75,
+        "upcoming_catalyst": null
+      }
+    },
+    {
+      "ticker": "EXRK",
+      "company_name": "Extreme Risk Corp (Test — expect CEO override: capped at 50)",
+      "sector": "Consumer Discretionary",
+      "market_cap_b": 2.1,
+      "technical": {
+        "rsi_14": 65.0,
+        "macd_signal": "bullish_crossover",
+        "ma_50": 18.0,
+        "ma_200": 15.0,
+        "volume_vs_avg": 3.5,
+        "atr_14": 1.8,
+        "support_level": 14.0,
+        "resistance_level": 22.0
+      },
+      "fundamental": {
+        "pe_ratio": 45.0,
+        "eps_growth_yoy": 0.05,
+        "revenue_growth_yoy": 0.03,
+        "gross_margin": 0.28,
+        "debt_to_equity": 2.5,
+        "free_cash_flow_b": -0.3
+      },
+      "sentiment": {
+        "analyst_rating": "hold",
+        "analyst_count": 8,
+        "news_sentiment_score": 0.2,
+        "social_sentiment": "neutral"
+      },
+      "risk": {
+        "beta": 4.2,
+        "week_52_high": 28.0,
+        "week_52_low": 8.0,
+        "implied_volatility": 0.78,
+        "short_interest_pct": 42.0
+      },
+      "macro": {
+        "sector_momentum": "neutral",
+        "index_correlation": 0.3,
+        "upcoming_catalyst": null
+      }
+    },
+    {
+      "ticker": "WEAK",
+      "company_name": "Weak Fundamentals Corp (Test — expect CEO override: forced SELL)",
+      "sector": "Energy",
+      "market_cap_b": 0.8,
+      "technical": {
+        "rsi_14": 18.0,
+        "macd_signal": "bearish_crossover",
+        "ma_50": 8.0,
+        "ma_200": 12.0,
+        "volume_vs_avg": 0.6,
+        "atr_14": 0.4,
+        "support_level": 5.0,
+        "resistance_level": 10.0
+      },
+      "fundamental": {
+        "pe_ratio": null,
+        "eps_growth_yoy": -0.45,
+        "revenue_growth_yoy": -0.22,
+        "gross_margin": 0.08,
+        "debt_to_equity": 7.5,
+        "free_cash_flow_b": -0.9
+      },
+      "sentiment": {
+        "analyst_rating": "sell",
+        "analyst_count": 5,
+        "news_sentiment_score": -0.6,
+        "social_sentiment": "negative"
+      },
+      "risk": {
+        "beta": 1.8,
+        "week_52_high": 15.0,
+        "week_52_low": 5.5,
+        "implied_volatility": 0.55,
+        "short_interest_pct": 12.0
+      },
+      "macro": {
+        "sector_momentum": "negative",
+        "index_correlation": 0.4,
+        "upcoming_catalyst": null
+      }
+    }
+  ]
+}

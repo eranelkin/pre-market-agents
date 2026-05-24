@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Settings, Database, Download, Upload, ChevronRight } from "lucide-react";
+import { useTestMode } from "@/lib/test-mode-context";
 
 const links = [
   { href: "/", label: "Home" },
@@ -16,6 +17,7 @@ export function NavBar() {
   const [open, setOpen] = useState(false);
   const [dbOpen, setDbOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const { testMode, setTestMode } = useTestMode();
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -62,6 +64,27 @@ export function NavBar() {
         {/* Spacer */}
         <div className="flex-1" />
 
+        {/* Test mode toggle */}
+        <div className="flex items-center gap-2 mr-3">
+          <button
+            role="switch"
+            aria-checked={testMode}
+            onClick={() => setTestMode(!testMode)}
+            className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus-visible:outline-none ${
+              testMode ? "bg-amber-500" : "bg-muted"
+            }`}
+          >
+            <span
+              className={`pointer-events-none inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform ${
+                testMode ? "translate-x-5" : "translate-x-0.5"
+              }`}
+            />
+          </button>
+          <span className={`text-sm font-medium ${testMode ? "text-amber-400" : "text-muted-foreground"}`}>
+            Test mode
+          </span>
+        </div>
+
         {/* Settings gear */}
         <div className="relative" ref={menuRef}>
           <button
@@ -90,15 +113,17 @@ export function NavBar() {
                 {dbOpen && (
                   <div className="absolute left-full top-0 -mt-1 ml-1 w-32 rounded-lg border border-[#4a4b52] bg-[#3C3D45] shadow-2xl py-1 z-50">
                     <button
-                      onClick={() => { setOpen(false); setDbOpen(false); }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-[#D7DFE7] hover:bg-[#44454e] transition-colors rounded-sm"
+                      disabled
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-colors rounded-sm opacity-35 cursor-not-allowed"
+                      style={{ color: "#D7DFE7" }}
                     >
                       <Download size={14} className="text-emerald-400" />
                       Export
                     </button>
                     <button
-                      onClick={() => { setOpen(false); setDbOpen(false); }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-[#D7DFE7] hover:bg-[#44454e] transition-colors rounded-sm"
+                      disabled
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-colors rounded-sm opacity-35 cursor-not-allowed"
+                      style={{ color: "#D7DFE7" }}
                     >
                       <Upload size={14} className="text-amber-400" />
                       Import

@@ -19,6 +19,15 @@ dev-backend:
 			--reload \
 			--reload-dir backend
 
+dev-backend-test:
+	@export $$(grep -v '^#' .env.dev | xargs) && \
+		AGENTS_CONFIG=agents_config.test.yaml \
+		.venv/bin/uvicorn backend.main:app \
+			--host 0.0.0.0 \
+			--port 3301 \
+			--reload \
+			--reload-dir backend
+
 dev-frontend:
 	cd frontend && PORT=3300 NEXT_PUBLIC_API_URL=http://localhost:3301 npm run dev
 

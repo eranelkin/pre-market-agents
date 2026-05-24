@@ -42,6 +42,7 @@ async def get_audit_log(
     agent_name: str | None = Query(None),
     ticker: str | None = Query(None),
     status: str | None = Query(None),
+    test_mode: bool | None = Query(None),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
@@ -67,6 +68,9 @@ async def get_audit_log(
         filters.append(AgentResultORM.was_fallback == True)  # noqa: E712
     elif status == "error":
         filters.append(AgentResultORM.parsed_output.is_(None))
+
+    if test_mode is not None:
+        filters.append(RunORM.test_mode == test_mode)
 
     count_stmt = select(func.count()).select_from(AgentResultORM)
     if filters:

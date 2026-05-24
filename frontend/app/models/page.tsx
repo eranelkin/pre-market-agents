@@ -7,6 +7,7 @@ import {
   TestConnectionResult,
 } from "@/lib/api";
 import { AddModelDialog } from "@/components/models/AddModelDialog";
+import { useTestMode } from "@/lib/test-mode-context";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -161,16 +162,17 @@ export default function ModelsPage() {
   const [error, setError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const { testMode } = useTestMode();
 
   const refresh = useCallback(async () => {
     try {
-      const d = await api.getVariants();
+      const d = await api.getVariants(testMode);
       setData(d);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
-  }, []);
+  }, [testMode]);
 
   useEffect(() => {
     refresh();
@@ -179,7 +181,7 @@ export default function ModelsPage() {
   const toggleActive = async (v: VariantDetail) => {
     setTogglingId(v.id);
     try {
-      await api.toggleVariantActive(v.id, !v.active);
+      await api.toggleVariantActive(v.id, !v.active, testMode);
       await refresh();
     } catch (e) {
       alert(e instanceof Error ? e.message : String(e));
@@ -220,6 +222,13 @@ export default function ModelsPage() {
             + Add Model
           </Button>
         </div>
+
+        {testMode && (
+          <div className="flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-400">
+            <span className="font-semibold">Test mode</span>
+            <span className="text-amber-400/70">— active variants shown from <code className="font-mono text-xs">agents_config.test.yaml</code>. Changes save there.</span>
+          </div>
+        )}
 
         {error && <p className="text-sm text-destructive">{error}</p>}
 

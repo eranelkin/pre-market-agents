@@ -4,6 +4,7 @@ import Link from "next/link";
 import { BarChart2, ClipboardList, GitCompare, Trash2, X } from "lucide-react";
 import { api, RunSummary, StartRunResponse } from "@/lib/api";
 import { RunAnalysisDialog } from "@/components/RunAnalysisDialog";
+import { useTestMode } from "@/lib/test-mode-context";
 import { StatusBadge } from "@/components/StatusBadge";
 import {
   Table,
@@ -103,6 +104,7 @@ export default function Home() {
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [elapsedMap, setElapsedMap] = useState<Record<string, number>>({});
   const [dialogOpen, setDialogOpen] = useState(false);
+  const { testMode } = useTestMode();
 
   const fetchRuns = useCallback(async () => {
     try {
@@ -210,18 +212,21 @@ export default function Home() {
               Daily AI-powered stock ranking pipeline
             </p>
           </div>
-          <button
-            onClick={() => setDialogOpen(true)}
-            className="rounded-full bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 active:bg-blue-700 transition-colors"
-          >
-            Run Analysis
-          </button>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setDialogOpen(true)}
+              className="rounded-full bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 active:bg-blue-700 transition-colors"
+            >
+              Run Analysis
+            </button>
+          </div>
         </header>
 
         <RunAnalysisDialog
           open={dialogOpen}
           onClose={() => setDialogOpen(false)}
           onStarted={(resp) => { onStarted(resp); setDialogOpen(false); }}
+          testMode={testMode}
         />
 
         <Card>
