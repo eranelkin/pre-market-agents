@@ -80,7 +80,7 @@ agents:
   fundamental:
     is_system: false
     weight: 0.25
-    active: false
+    active: true
     prompt_file: prompts/test/fundamental_prompt.md
     default_variant: llama_3_3_70b
     fallback_variant: gemini_flash
@@ -93,7 +93,7 @@ agents:
   sentiment:
     is_system: false
     weight: 0.2
-    active: false
+    active: true
     prompt_file: prompts/test/sentiment_prompt.md
     default_variant: llama_3_3_70b
     fallback_variant: gemini_flash
@@ -106,7 +106,7 @@ agents:
   risk:
     is_system: false
     weight: 0.15
-    active: false
+    active: true
     prompt_file: prompts/test/risk_prompt.md
     default_variant: llama_3_3_70b
     fallback_variant: gemini_flash
@@ -119,7 +119,7 @@ agents:
   macro:
     is_system: false
     weight: 0.1
-    active: false
+    active: true
     prompt_file: prompts/test/macro_prompt.md
     default_variant: llama_3_3_70b
     fallback_variant: gemini_flash

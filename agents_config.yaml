@@ -93,7 +93,7 @@ agents:
   sentiment:
     is_system: false
     weight: 0.2
-    active: false
+    active: true
     prompt_file: prompts/sentiment_prompt.md
     default_variant: claude_sonnet
     fallback_variant: gemini_flash
